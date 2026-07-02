@@ -1,0 +1,16 @@
+{
+  "name": "tracking-app-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "android": "react-native run-android",
+    "ios": "react-native run-ios",
+    "start": "react-native start"
+  },
+  "dependencies": {
+    "react": "18.2.0",
+    "react-native": "0.74.0",
+    "react-native-geolocation-service": "^5.3.1",
+    "react-native-background-geolocation": "^4.16.0"
+  }
+}
