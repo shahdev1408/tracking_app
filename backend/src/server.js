@@ -2,20 +2,26 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
+const path = require("path");
 
 const punchRoutes = require("./routes/punch");
 const trackingRoutes = require("./routes/tracking");
 const reportRoutes = require("./routes/reports");
+const authRoutes = require("./routes/auth");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Serve the admin dashboard (public/admin.html) as static files
+app.use(express.static(path.join(__dirname, "../public")));
 
 // Health check
 app.get("/", (req, res) => {
   res.json({ status: "ok", message: "Tracking app backend running" });
 });
 
+app.use("/api/auth", authRoutes);
 app.use("/api/punch", punchRoutes);
 app.use("/api/tracking", trackingRoutes);
 app.use("/api/reports", reportRoutes);

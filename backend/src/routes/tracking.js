@@ -1,19 +1,21 @@
 const express = require("express");
 const router = express.Router();
 const Ping = require("../models/Ping");
-const Employee = require("../models/Employee");
+const User = require("../models/User");
 const { evaluatePoint } = require("../utils/payRules");
+const { requireAuth } = require("../middleware/auth");
 
 // POST /api/tracking/ping — mobile app calls this every 30 min in the background
-router.post("/ping", async (req, res) => {
+router.post("/ping", requireAuth, async (req, res) => {
   try {
-    const { employeeId, latitude, longitude, timestamp } = req.body;
+    const employeeId = req.user.employeeId; // taken from the logged-in token, not the request body
+    const { latitude, longitude, timestamp } = req.body;
 
-    if (!employeeId || latitude == null || longitude == null) {
-      return res.status(400).json({ error: "employeeId, latitude, longitude are required" });
+    if (latitude == null || longitude == null) {
+      return res.status(400).json({ error: "latitude, longitude are required" });
     }
 
-    const emp = await Employee.findOne({ employeeId });
+    const emp = await User.findOne({ employeeId });
     const ts = timestamp ? new Date(timestamp) : new Date();
 
     const { isSunday, isOfficeHours, billable } = evaluatePoint(
@@ -27,6 +29,12 @@ router.post("/ping", async (req, res) => {
       isSunday, isOfficeHours, billable,
     });
 
+    // Update the employee's last known location (for the manager's live map)
+    await User.updateOne(
+      { employeeId },
+      { lastLocation: { latitude, longitude, timestamp: ts } }
+    );
+
     res.status(201).json({ message: "Ping recorded", ping });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -34,7 +42,7 @@ router.post("/ping", async (req, res) => {
 });
 
 // GET /api/tracking/:employeeId — list pings for an employee (optional ?from=&to=)
-router.get("/:employeeId", async (req, res) => {
+router.get("/:employeeId", requireAuth, async (req, res) => {
   try {
     const { employeeId } = req.params;
     const { from, to } = req.query;

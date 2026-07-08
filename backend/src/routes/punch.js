@@ -1,22 +1,24 @@
 const express = require("express");
 const router = express.Router();
 const Punch = require("../models/Punch");
-const Employee = require("../models/Employee");
+const User = require("../models/User");
 const { evaluatePoint } = require("../utils/payRules");
+const { requireAuth } = require("../middleware/auth");
 
 // POST /api/punch  — employee taps "punch in" or "punch out" on the app
-router.post("/", async (req, res) => {
+router.post("/", requireAuth, async (req, res) => {
   try {
-    const { employeeId, type, site, location, latitude, longitude, timestamp } = req.body;
+    const employeeId = req.user.employeeId; // from logged-in token, not request body
+    const { type, site, location, latitude, longitude, timestamp } = req.body;
 
-    if (!employeeId || !type || latitude == null || longitude == null) {
-      return res.status(400).json({ error: "employeeId, type, latitude, longitude are required" });
+    if (!type || latitude == null || longitude == null) {
+      return res.status(400).json({ error: "type, latitude, longitude are required" });
     }
     if (!["in", "out"].includes(type)) {
       return res.status(400).json({ error: "type must be 'in' or 'out'" });
     }
 
-    const emp = await Employee.findOne({ employeeId });
+    const emp = await User.findOne({ employeeId });
     const ts = timestamp ? new Date(timestamp) : new Date();
 
     const { isSunday, isOfficeHours, billable } = evaluatePoint(
@@ -30,6 +32,12 @@ router.post("/", async (req, res) => {
       timestamp: ts, isSunday, isOfficeHours, billable,
     });
 
+    // Also update last known location so manager's live map reflects punches too
+    await User.updateOne(
+      { employeeId },
+      { lastLocation: { latitude, longitude, timestamp: ts } }
+    );
+
     res.status(201).json({ message: "Punch recorded", punch });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -37,7 +45,7 @@ router.post("/", async (req, res) => {
 });
 
 // GET /api/punch/:employeeId — list punches for an employee (optional ?from=&to=)
-router.get("/:employeeId", async (req, res) => {
+router.get("/:employeeId", requireAuth, async (req, res) => {
   try {
     const { employeeId } = req.params;
     const { from, to } = req.query;

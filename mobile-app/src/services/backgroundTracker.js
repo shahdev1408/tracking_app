@@ -4,8 +4,11 @@
  * (this is a paid-license library after a trial period — see note at bottom
  *  for a free alternative if budget is a concern)
  *
- * This pings the backend every 30 minutes with the employee's current
- * location, even when the app is closed or the phone is locked.
+ * Triggers a location ping to the backend whichever happens FIRST:
+ *   - 30 minutes pass, OR
+ *   - the employee moves 1 km from their last recorded point
+ * This matches real fleet-tracking behavior: frequent updates while moving,
+ * periodic updates while stationary (so you always know they're still on shift).
  */
 import BackgroundGeolocation from "react-native-background-geolocation";
 import { sendPing } from "./api";
@@ -17,10 +20,16 @@ export function initBackgroundTracking(employeeId) {
 
   BackgroundGeolocation.ready({
     desiredAccuracy: BackgroundGeolocation.DESIRED_ACCURACY_HIGH,
-    distanceFilter: 0,          // don't filter by distance, we want time-based pings
+
+    // Distance-based trigger: fires a location update once the employee
+    // has moved 1000 meters (1 km) from the last recorded point.
+    distanceFilter: 1000,
+
+    // Time-based trigger (fallback for when they're stationary, e.g. sitting
+    // at a desk or in a meeting): fires every 30 minutes regardless of movement.
+    heartbeatInterval: 1800, // seconds
+
     stopTimeout: 5,
-    // Time-based tracking: fire every 30 minutes (1800000 ms)
-    heartbeatInterval: 1800,     // seconds
     stopOnTerminate: false,      // keep tracking after app is force-closed (Android)
     startOnBoot: true,           // resume tracking after phone restart
     foregroundService: true,     // required on Android 8+ for reliable background tracking
@@ -34,7 +43,21 @@ export function initBackgroundTracking(employeeId) {
     }
   });
 
-  // Fires on the heartbeatInterval defined above
+  // Fires when the employee moves >= distanceFilter (1km)
+  BackgroundGeolocation.onLocation(async (location) => {
+    try {
+      await sendPing({
+        employeeId: currentEmployeeId,
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      });
+      console.log("Ping sent (1km movement trigger)");
+    } catch (err) {
+      console.log("Movement ping failed, will retry on next trigger:", err.message);
+    }
+  });
+
+  // Fires on the heartbeatInterval (30 min) - covers stationary periods
   BackgroundGeolocation.onHeartbeat(async (event) => {
     try {
       const location = await BackgroundGeolocation.getCurrentPosition({ persist: false });
@@ -43,9 +66,9 @@ export function initBackgroundTracking(employeeId) {
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
       });
-      console.log("Background ping sent successfully");
+      console.log("Ping sent (30 min heartbeat trigger)");
     } catch (err) {
-      console.log("Background ping failed, will retry next interval:", err.message);
+      console.log("Heartbeat ping failed, will retry next interval:", err.message);
     }
   });
 }
