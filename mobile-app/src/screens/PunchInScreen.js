@@ -1,14 +1,26 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from "react-native";
+import React, { useState } from "react";
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, PermissionsAndroid, Platform } from "react-native";
 import Geolocation from "react-native-geolocation-service";
 import { sendPunch } from "../services/api";
 
-// Replace with real logged-in employee ID (from login/auth flow)
-const EMPLOYEE_ID = "EMP001";
-
-export default function PunchInScreen() {
+export default function PunchInScreen({ user, onLogout }) {
   const [loading, setLoading] = useState(false);
   const [lastPunch, setLastPunch] = useState(null);
+
+  async function requestLocationPermission() {
+    if (Platform.OS === "android") {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+        {
+          title: "Location Permission",
+          message: "This app needs your location to record site visits.",
+          buttonPositive: "Allow",
+        }
+      );
+      return granted === PermissionsAndroid.RESULTS.GRANTED;
+    }
+    return true;
+  }
 
   const getCurrentLocation = () =>
     new Promise((resolve, reject) => {
@@ -22,9 +34,15 @@ export default function PunchInScreen() {
   const handlePunch = async (type) => {
     setLoading(true);
     try {
+      const hasPermission = await requestLocationPermission();
+      if (!hasPermission) {
+        Alert.alert("Permission Required", "Location permission is needed to punch in/out.");
+        setLoading(false);
+        return;
+      }
+
       const coords = await getCurrentLocation();
       const result = await sendPunch({
-        employeeId: EMPLOYEE_ID,
         type,
         latitude: coords.latitude,
         longitude: coords.longitude,
@@ -41,7 +59,7 @@ export default function PunchInScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Site Visit Tracker</Text>
-      <Text style={styles.subtitle}>Employee: {EMPLOYEE_ID}</Text>
+      <Text style={styles.subtitle}>{user.name} ({user.employeeId})</Text>
 
       {loading ? (
         <ActivityIndicator size="large" color="#22c55e" style={{ marginVertical: 30 }} />
@@ -67,6 +85,10 @@ export default function PunchInScreen() {
           </Text>
         </View>
       )}
+
+      <TouchableOpacity onPress={onLogout} style={{ marginTop: 30 }}>
+        <Text style={styles.logoutText}>Log Out</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -83,4 +105,5 @@ const styles = StyleSheet.create({
   lastPunchBox: { marginTop: 30, padding: 16, backgroundColor: "#1e293b", borderRadius: 10 },
   lastPunchLabel: { color: "#94a3b8", fontSize: 12, marginBottom: 4 },
   lastPunchText: { color: "#f1f5f9", fontSize: 14 },
+  logoutText: { color: "#f87171", textAlign: "center", fontSize: 13 },
 });

@@ -1,21 +1,30 @@
-import React, { useEffect } from "react";
-import { SafeAreaView, StatusBar } from "react-native";
-import PunchInScreen from "./src/screens/PunchInScreen";
-import { initBackgroundTracking } from "./src/services/backgroundTracker";
-
-const EMPLOYEE_ID = "EMP001"; // replace with real logged-in employee ID
+import React, { useState } from 'react';
+import { SafeAreaView, StatusBar } from 'react-native';
+import LoginScreen from './src/screens/LoginScreen';
+import PunchInScreen from './src/screens/PunchInScreen';
+import { setAuthToken } from './src/services/api';
 
 export default function App() {
-  useEffect(() => {
-    // Starts the 30-min background ping as soon as the app is opened.
-    // Location permission must be granted first (handle that in a login/onboarding screen).
-    initBackgroundTracking(EMPLOYEE_ID);
-  }, []);
+  const [user, setUser] = useState(null);
+
+  const handleLoginSuccess = (loggedInUser, token) => {
+    setAuthToken(token);
+    setUser(loggedInUser);
+  };
+
+  const handleLogout = () => {
+    setAuthToken(null);
+    setUser(null);
+  };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#0f172a" }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#0f172a' }}>
       <StatusBar barStyle="light-content" />
-      <PunchInScreen />
+      {user ? (
+        <PunchInScreen user={user} onLogout={handleLogout} />
+      ) : (
+        <LoginScreen onLoginSuccess={handleLoginSuccess} />
+      )}
     </SafeAreaView>
   );
 }
