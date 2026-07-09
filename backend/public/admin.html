@@ -105,6 +105,10 @@
   }
   .day-row .date { font-weight: bold; color: #22c55e; }
   .day-row .stat { color: #94a3b8; }
+  .day-row .btn-route {
+    margin-top: 6px; background: #3b82f6; color: white; border: none;
+    padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 11px;
+  }
 </style>
 </head>
 <body>
@@ -275,7 +279,6 @@
     document.getElementById("dailyList").innerHTML = "";
 
     try {
-      // Get employee basic info from the already-loaded list
       const usersRes = await fetch(`${API_BASE}/api/auth/users`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -288,7 +291,6 @@
       document.getElementById("editRate").value = emp.ratePerKm || 0;
       document.getElementById("editPassword").value = "";
 
-      // Get daily summary for payroll view
       const dailyRes = await fetch(`${API_BASE}/api/reports/daily/${employeeId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -307,15 +309,18 @@
     }
   }
 
+  let lastLoadedDays = [];
+
   function renderDailySummary(days) {
+    lastLoadedDays = days;
     const list = document.getElementById("dailyList");
     if (!days.length) {
       list.innerHTML = `<div style="color:#94a3b8; font-size:13px;">No activity recorded yet.</div>`;
       return;
     }
     list.innerHTML = "";
-    // Most recent day first
-    [...days].reverse().forEach((d) => {
+    [...days].reverse().forEach((d, idx) => {
+      const realIdx = days.length - 1 - idx;
       const inTime = d.punchInTime ? new Date(d.punchInTime).toLocaleTimeString() : "—";
       const outTime = d.punchOutTime ? new Date(d.punchOutTime).toLocaleTimeString() : "—";
       const row = document.createElement("div");
@@ -325,9 +330,49 @@
         <div class="stat">Punch: ${inTime} → ${outTime} &nbsp;|&nbsp; Points: ${d.pingCount}</div>
         <div class="stat">Total: ${d.totalKm} km &nbsp;|&nbsp; Billable: ${d.billableKm} km &nbsp;|&nbsp; Personal: ${d.personalKm} km</div>
         <div class="stat" style="color:#22c55e; font-weight:bold;">Pay: ₹${d.pay}</div>
+        ${d.route.length > 0 ? `<button class="btn-route" onclick="showRouteOnMap(${realIdx})">View Route on Map</button>` : ""}
       `;
       list.appendChild(row);
     });
+  }
+
+  let routeLayerGroup = null;
+
+  function showRouteOnMap(dayIndex) {
+    const day = lastLoadedDays[dayIndex];
+    if (!day || !day.route.length) return;
+
+    closeModal();
+
+    if (routeLayerGroup) {
+      map.removeLayer(routeLayerGroup);
+    }
+    routeLayerGroup = L.layerGroup().addTo(map);
+
+    const latlngs = day.route.map((p) => [p.latitude, p.longitude]);
+
+    L.polyline(latlngs, { color: "#3b82f6", weight: 4 }).addTo(routeLayerGroup);
+
+    const startIcon = L.divIcon({
+      html: '<div style="background:#22c55e;width:16px;height:16px;border-radius:50%;border:3px solid white;"></div>',
+      className: "", iconSize: [16, 16],
+    });
+    L.marker(latlngs[0], { icon: startIcon })
+      .addTo(routeLayerGroup)
+      .bindPopup(`<b>Start</b><br>${new Date(day.route[0].timestamp).toLocaleTimeString()}`);
+
+    if (latlngs.length > 1) {
+      const endIcon = L.divIcon({
+        html: '<div style="background:#ef4444;width:16px;height:16px;border-radius:50%;border:3px solid white;"></div>',
+        className: "", iconSize: [16, 16],
+      });
+      const last = day.route[day.route.length - 1];
+      L.marker(latlngs[latlngs.length - 1], { icon: endIcon })
+        .addTo(routeLayerGroup)
+        .bindPopup(`<b>Last point</b><br>${new Date(last.timestamp).toLocaleTimeString()}`);
+    }
+
+    map.fitBounds(latlngs, { padding: [40, 40] });
   }
 
   function closeModal() {
@@ -443,7 +488,6 @@
     }
   }
 
-  // Auto-login if token already saved, and refresh every 30s for live tracking
   if (token) {
     showDashboard();
   }
