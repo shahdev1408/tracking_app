@@ -9,6 +9,7 @@ const pingSchema = new mongoose.Schema({
   isSunday: { type: Boolean, default: false },
   isOfficeHours: { type: Boolean, default: false },
   billable: { type: Boolean, default: false },
+  placeName: { type: String }, // human-readable address from reverse geocoding
 }, { timestamps: true });
 
 module.exports = mongoose.model("Ping", pingSchema);

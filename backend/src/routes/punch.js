@@ -4,6 +4,7 @@ const Punch = require("../models/Punch");
 const User = require("../models/User");
 const { evaluatePoint } = require("../utils/payRules");
 const { requireAuth } = require("../middleware/auth");
+const { reverseGeocode } = require("../utils/geocode");
 
 // POST /api/punch  — employee taps "punch in" or "punch out" on the app
 router.post("/", requireAuth, async (req, res) => {
@@ -27,15 +28,18 @@ router.post("/", requireAuth, async (req, res) => {
       emp?.officeEndTime
     );
 
+    // Look up the place name (won't block/slow the response if it's slow or fails)
+    const placeName = await reverseGeocode(latitude, longitude);
+
     const punch = await Punch.create({
       employeeId, type, site, location, latitude, longitude,
-      timestamp: ts, isSunday, isOfficeHours, billable,
+      timestamp: ts, isSunday, isOfficeHours, billable, placeName,
     });
 
     // Also update last known location so manager's live map reflects punches too
     await User.updateOne(
       { employeeId },
-      { lastLocation: { latitude, longitude, timestamp: ts } }
+      { lastLocation: { latitude, longitude, timestamp: ts, placeName } }
     );
 
     res.status(201).json({ message: "Punch recorded", punch });

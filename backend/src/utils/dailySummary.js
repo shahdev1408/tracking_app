@@ -1,4 +1,4 @@
-const { totalDistanceKm } = require("./distance");
+const { totalDistanceKm, haversineKm } = require("./distance");
 
 /**
  * Groups pings by calendar day (in local server time) and computes,
@@ -57,6 +57,24 @@ function buildDailySummary(pings, punches, ratePerKm = 0) {
       const totalKm = totalDistanceKm(dayPings);
       const pay = Number((billableKm * ratePerKm).toFixed(2));
 
+      // Build route with cumulative distance at each point (like a fitness app
+      // showing "at the 2km mark, you were here") - useful for verifying travel.
+      let cumulativeKm = 0;
+      const routeWithDistance = dayPings.map((p, i) => {
+        if (i > 0) {
+          const prev = dayPings[i - 1];
+          cumulativeKm += haversineKm(prev.latitude, prev.longitude, p.latitude, p.longitude);
+        }
+        return {
+          latitude: p.latitude,
+          longitude: p.longitude,
+          timestamp: p.timestamp,
+          billable: p.billable,
+          placeName: p.placeName || null,
+          cumulativeKm: Number(cumulativeKm.toFixed(2)),
+        };
+      });
+
       return {
         date: dateKey,
         firstActivity,
@@ -70,9 +88,18 @@ function buildDailySummary(pings, punches, ratePerKm = 0) {
         pay,
         pingCount: dayPings.length,
         punchCount: dayPunches.length,
-        route: dayPings.map((p) => ({
-          latitude: p.latitude, longitude: p.longitude, timestamp: p.timestamp, billable: p.billable,
+        // Full detail lists - kept SEPARATE so manual and auto never get confused
+        manualPunches: dayPunches.map((p) => ({
+          type: p.type,
+          timestamp: p.timestamp,
+          latitude: p.latitude,
+          longitude: p.longitude,
+          placeName: p.placeName || null,
+          billable: p.billable,
         })),
+        autoPings: routeWithDistance,
+        // Kept for map drawing (same data as autoPings, simple shape)
+        route: routeWithDistance,
       };
     });
 

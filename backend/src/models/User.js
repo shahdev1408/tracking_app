@@ -14,6 +14,7 @@ const userSchema = new mongoose.Schema({
     latitude: Number,
     longitude: Number,
     timestamp: Date,
+    placeName: String,
   },
 }, { timestamps: true });
 

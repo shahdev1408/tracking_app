@@ -10,7 +10,8 @@ const punchSchema = new mongoose.Schema({
   timestamp: { type: Date, default: Date.now },
   isSunday: { type: Boolean, default: false },
   isOfficeHours: { type: Boolean, default: false },
-  billable: { type: Boolean, default: false }, // computed from rules
+  billable: { type: Boolean, default: false },
+  placeName: { type: String }, // human-readable address from reverse geocoding // computed from rules
 }, { timestamps: true });
 
 module.exports = mongoose.model("Punch", punchSchema);

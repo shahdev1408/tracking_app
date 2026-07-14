@@ -4,8 +4,9 @@ const Ping = require("../models/Ping");
 const User = require("../models/User");
 const { evaluatePoint } = require("../utils/payRules");
 const { requireAuth } = require("../middleware/auth");
+const { reverseGeocode } = require("../utils/geocode");
 
-// POST /api/tracking/ping — mobile app calls this every 30 min in the background
+// POST /api/tracking/ping — mobile app calls this automatically (every 1km moved or 15-30 min)
 router.post("/ping", requireAuth, async (req, res) => {
   try {
     const employeeId = req.user.employeeId; // taken from the logged-in token, not the request body
@@ -24,15 +25,17 @@ router.post("/ping", requireAuth, async (req, res) => {
       emp?.officeEndTime
     );
 
+    const placeName = await reverseGeocode(latitude, longitude);
+
     const ping = await Ping.create({
       employeeId, latitude, longitude, timestamp: ts,
-      isSunday, isOfficeHours, billable,
+      isSunday, isOfficeHours, billable, placeName,
     });
 
     // Update the employee's last known location (for the manager's live map)
     await User.updateOne(
       { employeeId },
-      { lastLocation: { latitude, longitude, timestamp: ts } }
+      { lastLocation: { latitude, longitude, timestamp: ts, placeName } }
     );
 
     res.status(201).json({ message: "Ping recorded", ping });
