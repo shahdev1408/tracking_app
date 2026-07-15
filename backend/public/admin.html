@@ -226,6 +226,10 @@
         <h3>Add Employee</h3>
         <input id="newEmpId" placeholder="Employee ID (e.g. EMP002)" />
         <input id="newEmpName" placeholder="Full Name" />
+        <select id="newEmpRole">
+          <option value="employee">Employee</option>
+          <option value="manager">Manager</option>
+        </select>
         <input id="newEmpRate" type="number" step="0.01" placeholder="Pay Rate per Km (e.g. 10)" />
         <input id="newEmpPassword" type="password" placeholder="Temporary Password" />
         <button onclick="addEmployee()">Add Employee</button>
@@ -538,7 +542,30 @@
 
   let routeLayerGroup = null;
 
-  function showRouteOnMap(dayIndex) {
+  // Snaps GPS points to actual roads using the free public OSRM routing
+  // service, so the blue line follows streets instead of cutting straight
+  // between sparse points. Falls back to the straight line if it fails
+  // (e.g. too many points, or the free server is temporarily overloaded -
+  // this public demo server isn't meant for heavy production traffic; for
+  // serious scale, self-host OSRM or use a paid routing API instead).
+  async function snapRouteToRoads(latlngs) {
+    if (latlngs.length < 2) return null;
+    try {
+      const coords = latlngs.map((p) => `${p[1]},${p[0]}`).join(";");
+      const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`;
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data.code !== "Ok" || !data.routes?.[0]) return null;
+      // GeoJSON is [lon, lat] - Leaflet wants [lat, lon]
+      return data.routes[0].geometry.coordinates.map((c) => [c[1], c[0]]);
+    } catch (err) {
+      console.log("Road snapping failed, using straight line:", err.message);
+      return null;
+    }
+  }
+
+  async function showRouteOnMap(dayIndex) {
     const day = lastLoadedDays[dayIndex];
     if (!day || !day.route.length) return;
 
@@ -552,7 +579,10 @@
     routeLayerGroup = L.layerGroup().addTo(map);
 
     const latlngs = day.route.map((p) => [p.latitude, p.longitude]);
-    L.polyline(latlngs, { color: "#3b82f6", weight: 4 }).addTo(routeLayerGroup);
+
+    // Try to snap to roads; fall back to straight line if it fails
+    const snapped = await snapRouteToRoads(latlngs);
+    L.polyline(snapped || latlngs, { color: "#3b82f6", weight: 4 }).addTo(routeLayerGroup);
 
     const startIcon = L.divIcon({
       html: '<div style="background:#22c55e;width:16px;height:16px;border-radius:50%;border:3px solid white;"></div>',
@@ -684,12 +714,13 @@
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
   }
 
-  function drawLiveRoute(route) {
+  async function drawLiveRoute(route) {
     if (liveRouteLayerGroup) map.removeLayer(liveRouteLayerGroup);
     liveRouteLayerGroup = L.layerGroup().addTo(map);
 
     const latlngs = route.map((p) => [p.latitude, p.longitude]);
-    L.polyline(latlngs, { color: "#3b82f6", weight: 4, dashArray: "6,6" }).addTo(liveRouteLayerGroup);
+    const snapped = await snapRouteToRoads(latlngs);
+    L.polyline(snapped || latlngs, { color: "#3b82f6", weight: 4, dashArray: "6,6" }).addTo(liveRouteLayerGroup);
 
     const currentIcon = L.divIcon({
       html: '<div class="pulse-dot"></div>', className: "", iconSize: [16, 16],
@@ -721,6 +752,7 @@
   async function addEmployee() {
     const employeeId = document.getElementById("newEmpId").value.trim();
     const name = document.getElementById("newEmpName").value.trim();
+    const role = document.getElementById("newEmpRole").value;
     const ratePerKm = parseFloat(document.getElementById("newEmpRate").value) || 0;
     const password = document.getElementById("newEmpPassword").value;
 
@@ -733,13 +765,14 @@
       const res = await fetch(`${API_BASE}/api/auth/users`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ employeeId, name, password, ratePerKm }),
+        body: JSON.stringify({ employeeId, name, password, ratePerKm, role }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to add employee");
 
       document.getElementById("newEmpId").value = "";
       document.getElementById("newEmpName").value = "";
+      document.getElementById("newEmpRole").value = "employee";
       document.getElementById("newEmpRate").value = "";
       document.getElementById("newEmpPassword").value = "";
       await loadEmployees();
