@@ -3,142 +3,149 @@
 <head>
 <meta charset="UTF-8" />
 <title>Admin Dashboard - Tracking App</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
-  * { box-sizing: border-box; }
-  body {
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
     font-family: -apple-system, Segoe UI, Roboto, sans-serif;
     margin: 0; background: #0f172a; color: #f1f5f9;
+    height: 100%; overflow: hidden;
   }
   .hidden { display: none !important; }
 
-  /* Login screen */
+  /* ---------- Login screen ---------- */
   #loginScreen {
     display: flex; align-items: center; justify-content: center;
-    height: 100vh;
+    height: 100vh; padding: 16px;
   }
   .login-box {
-    background: #1e293b; padding: 32px; border-radius: 12px; width: 320px;
+    background: #1e293b; padding: 32px; border-radius: 12px;
+    width: 100%; max-width: 340px;
   }
   .login-box h2 { margin-top: 0; text-align: center; }
   .login-box input {
-    width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px;
-    border: none; background: #0b1220; color: #f1f5f9; font-size: 14px;
+    width: 100%; padding: 14px; margin: 8px 0; border-radius: 8px;
+    border: none; background: #0b1220; color: #f1f5f9; font-size: 16px;
   }
   .login-box button {
-    width: 100%; padding: 12px; margin-top: 12px; border: none; border-radius: 8px;
-    background: #22c55e; color: white; font-weight: bold; font-size: 14px; cursor: pointer;
+    width: 100%; padding: 14px; margin-top: 12px; border: none; border-radius: 8px;
+    background: #22c55e; color: white; font-weight: bold; font-size: 15px; cursor: pointer;
   }
   .login-box button:hover { background: #16a34a; }
   .error-msg { color: #f87171; font-size: 13px; margin-top: 8px; text-align: center; }
 
-  /* Dashboard */
-  #dashboard { display: none; }
+  /* ---------- Dashboard shell ---------- */
+  #dashboard { display: none; height: 100vh; flex-direction: column; }
   header {
-    padding: 16px 24px; background: #1e293b; display: flex;
-    justify-content: space-between; align-items: center;
+    padding: 12px 16px; background: #1e293b; display: flex;
+    justify-content: space-between; align-items: center; flex-shrink: 0;
   }
-  header h1 { font-size: 18px; margin: 0; }
+  header h1 { font-size: 16px; margin: 0; }
+  header .header-actions { display: flex; gap: 8px; align-items: center; }
   header button {
-    background: #334155; color: #f1f5f9; border: none; padding: 8px 16px;
-    border-radius: 8px; cursor: pointer;
+    background: #334155; color: #f1f5f9; border: none; padding: 10px 14px;
+    border-radius: 8px; cursor: pointer; font-size: 13px;
   }
-  .layout { display: flex; height: calc(100vh - 60px); }
+
+  .layout { display: flex; flex: 1; min-height: 0; }
   #employeePanel {
     width: 340px; background: #1e293b; padding: 16px; overflow-y: auto;
+    flex-shrink: 0;
   }
   #employeePanel h3 { margin-top: 0; }
+  #map { flex: 1; min-width: 0; }
+
+  /* Mobile view-switch button - hidden on larger screens */
+  .view-switch-btn { display: none; }
+
   .emp-row {
-    background: #0b1220; padding: 10px 12px; border-radius: 8px; margin-bottom: 8px;
+    background: #0b1220; padding: 12px; border-radius: 8px; margin-bottom: 8px;
     display: flex; justify-content: space-between; align-items: center; font-size: 13px;
+    cursor: pointer;
   }
+  .emp-row:hover { background: #16233a; }
   .emp-row .name { font-weight: bold; }
-  .emp-row .sub { color: #94a3b8; font-size: 11px; }
-  .emp-row button {
-    background: #ef4444; color: white; border: none; padding: 6px 10px;
-    border-radius: 6px; cursor: pointer; font-size: 11px;
-  }
-  #map { flex: 1; }
+  .emp-row .sub { color: #94a3b8; font-size: 11px; margin-top: 2px; }
+
   .add-form { margin-top: 16px; border-top: 1px solid #334155; padding-top: 16px; }
   .add-form input, .add-form select {
-    width: 100%; padding: 8px; margin: 4px 0; border-radius: 6px; border: none;
-    background: #0b1220; color: #f1f5f9; font-size: 13px;
+    width: 100%; padding: 12px; margin: 4px 0; border-radius: 6px; border: none;
+    background: #0b1220; color: #f1f5f9; font-size: 15px;
   }
   .add-form button {
-    width: 100%; padding: 10px; margin-top: 8px; border: none; border-radius: 6px;
-    background: #22c55e; color: white; font-weight: bold; cursor: pointer;
+    width: 100%; padding: 12px; margin-top: 8px; border: none; border-radius: 6px;
+    background: #22c55e; color: white; font-weight: bold; cursor: pointer; font-size: 14px;
   }
 
-  .emp-row { cursor: pointer; }
-  .emp-row:hover { background: #16233a; }
-  .emp-actions { display: flex; gap: 4px; }
-  .emp-actions button { font-size: 11px; padding: 6px 8px; border: none; border-radius: 6px; cursor: pointer; }
+  .emp-actions { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 8px; }
+  .emp-actions button {
+    font-size: 11px; padding: 8px 10px; border: none; border-radius: 6px; cursor: pointer;
+  }
   .btn-edit { background: #334155; color: #f1f5f9; }
   .btn-remove { background: #ef4444; color: white; }
+  .btn-live { background: #f59e0b; color: white; }
+  .btn-live.active { background: #ef4444; }
 
-  /* Modal */
+  /* ---------- Modal ---------- */
   .modal-overlay {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center;
-    z-index: 9999;
+    background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center;
+    z-index: 9999; padding: 12px;
   }
   .modal-box {
-    background: #1e293b; padding: 24px; border-radius: 12px; width: 600px;
-    max-height: 80vh; overflow-y: auto;
+    background: #1e293b; padding: 20px; border-radius: 12px; width: 100%; max-width: 620px;
+    max-height: 90vh; overflow-y: auto;
   }
-  .modal-box h2 { margin-top: 0; }
+  .modal-box h2 { margin-top: 0; font-size: 18px; word-break: break-word; }
   .modal-box input, .modal-box select {
-    width: 100%; padding: 10px; margin: 6px 0; border-radius: 8px;
-    border: none; background: #0b1220; color: #f1f5f9; font-size: 14px;
+    width: 100%; padding: 12px; margin: 6px 0; border-radius: 8px;
+    border: none; background: #0b1220; color: #f1f5f9; font-size: 15px;
   }
-  .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+  .modal-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
   .modal-actions button {
-    flex: 1; padding: 10px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;
+    flex: 1; min-width: 120px; padding: 12px; border: none; border-radius: 8px;
+    cursor: pointer; font-weight: bold; font-size: 14px;
   }
   .btn-save { background: #22c55e; color: white; }
   .btn-cancel { background: #334155; color: #f1f5f9; }
   .btn-danger { background: #ef4444; color: white; }
-
-  .day-row {
-    background: #0b1220; padding: 10px 12px; border-radius: 8px; margin-bottom: 8px; font-size: 13px;
+  .btn-download {
+    background: #22c55e; color: white; border: none; padding: 8px 14px;
+    border-radius: 6px; cursor: pointer; font-size: 13px; margin-top: 6px;
   }
-  .day-row .date { font-weight: bold; color: #22c55e; }
-  .day-row .stat { color: #94a3b8; }
+
+  .detail-stats-row { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: #94a3b8; margin-bottom: 12px; }
+
+  /* ---------- Daily summary rows ---------- */
+  .day-row {
+    background: #0b1220; padding: 12px; border-radius: 8px; margin-bottom: 10px; font-size: 13px;
+  }
+  .day-row .date { font-weight: bold; color: #22c55e; font-size: 14px; }
+  .day-row .stat { color: #94a3b8; margin-top: 4px; }
   .day-row .btn-route {
-    margin-top: 6px; background: #3b82f6; color: white; border: none;
-    padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 11px;
+    margin-top: 8px; background: #3b82f6; color: white; border: none;
+    padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; width: 100%;
   }
 
   .section-toggle {
-    margin-top: 10px; padding: 6px 8px; background: #16233a; border-radius: 6px;
+    margin-top: 10px; padding: 8px 10px; background: #16233a; border-radius: 6px;
     cursor: pointer; font-size: 12px; font-weight: bold; color: #f1f5f9;
   }
   .section-toggle:hover { background: #1c2b45; }
   .section-body { margin-top: 6px; max-height: 260px; overflow-y: auto; }
   .point-row {
-    background: #0b1220; padding: 8px 10px; border-radius: 6px; margin-bottom: 6px;
+    background: #0b1220; padding: 10px; border-radius: 6px; margin-bottom: 6px;
     font-size: 11px; color: #cbd5e1; border-left: 3px solid #3b82f6;
   }
-  .point-row .mono { font-family: monospace; color: #94a3b8; }
+  .point-row .mono { font-family: monospace; color: #94a3b8; word-break: break-all; }
   .point-row .place { color: #60a5fa; font-style: italic; }
 
   .btn-delete-point {
     background: #7f1d1d; color: #fca5a5; border: none; border-radius: 4px;
-    width: 22px; height: 22px; cursor: pointer; font-size: 12px; flex-shrink: 0;
+    width: 26px; height: 26px; cursor: pointer; font-size: 13px; flex-shrink: 0;
   }
   .btn-delete-point:hover { background: #ef4444; color: white; }
-
-  .btn-download {
-    background: #22c55e; color: white; border: none; padding: 4px 10px;
-    border-radius: 6px; cursor: pointer; font-size: 12px;
-  }
-
-  .btn-live {
-    background: #f59e0b; color: white; border: none; font-size: 11px;
-    padding: 6px 8px; border-radius: 6px; cursor: pointer;
-  }
-  .btn-live.active { background: #ef4444; }
 
   .pulse-dot {
     width: 16px; height: 16px; border-radius: 50%; background: #3b82f6;
@@ -150,6 +157,40 @@
     70% { box-shadow: 0 0 0 12px rgba(59,130,246,0); }
     100% { box-shadow: 0 0 0 0 rgba(59,130,246,0); }
   }
+
+  /* Leaflet control sizing - bigger touch targets on all devices */
+  .leaflet-control-zoom a { width: 36px !important; height: 36px !important; line-height: 36px !important; font-size: 18px !important; }
+
+  /* ============ TABLET ============ */
+  @media (max-width: 1024px) {
+    #employeePanel { width: 280px; }
+  }
+
+  /* ============ MOBILE ============ */
+  @media (max-width: 768px) {
+    header h1 { font-size: 14px; }
+    header button { padding: 8px 10px; font-size: 12px; }
+
+    .layout { position: relative; }
+
+    #employeePanel {
+      width: 100%; position: absolute; inset: 0; z-index: 10;
+      background: #0f172a;
+    }
+    #employeePanel.map-mode { display: none; }
+
+    #map { position: absolute; inset: 0; width: 100%; }
+    #map.list-mode { display: none; }
+
+    .view-switch-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+
+    .modal-box { max-height: 95vh; padding: 16px; }
+    .modal-actions button { min-width: 100%; }
+
+    .emp-actions button { flex: 1; min-width: 70px; }
+  }
 </style>
 </head>
 <body>
@@ -158,8 +199,8 @@
 <div id="loginScreen">
   <div class="login-box">
     <h2>Manager Login</h2>
-    <input id="loginEmployeeId" placeholder="Employee ID" />
-    <input id="loginPassword" type="password" placeholder="Password" />
+    <input id="loginEmployeeId" placeholder="Employee ID" autocomplete="username" />
+    <input id="loginPassword" type="password" placeholder="Password" autocomplete="current-password" />
     <button onclick="login()">Log In</button>
     <div id="loginError" class="error-msg"></div>
   </div>
@@ -169,7 +210,12 @@
 <div id="dashboard">
   <header>
     <h1>Employee Tracking Dashboard</h1>
-    <button onclick="logout()">Log Out</button>
+    <div class="header-actions">
+      <button class="view-switch-btn" onclick="toggleMobileView()">
+        <span id="viewSwitchLabel">Show Map</span>
+      </button>
+      <button onclick="logout()">Log Out</button>
+    </div>
   </header>
   <div class="layout">
     <div id="employeePanel">
@@ -193,7 +239,7 @@
 <div id="detailModal" class="modal-overlay hidden">
   <div class="modal-box">
     <h2 id="detailName">Employee</h2>
-    <div id="detailStats" style="color:#94a3b8; font-size:13px; margin-bottom:12px;"></div>
+    <div id="detailStats" class="detail-stats-row"></div>
 
     <h3 style="margin-bottom:6px;">Daily Summary (Punch In → Out, Km travelled)</h3>
     <div id="dailyList"></div>
@@ -215,11 +261,33 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-  // Change this if your backend URL is different
   const API_BASE = window.location.origin;
-
   let token = localStorage.getItem("adminToken") || "";
   let map, markers = {};
+  let mobileViewMode = "list"; // "list" or "map" - only relevant on small screens
+
+  // ---------- Mobile view switch ----------
+  function toggleMobileView() {
+    mobileViewMode = mobileViewMode === "list" ? "map" : "list";
+    applyMobileView();
+  }
+
+  function applyMobileView() {
+    const panel = document.getElementById("employeePanel");
+    const mapEl = document.getElementById("map");
+    const label = document.getElementById("viewSwitchLabel");
+
+    if (mobileViewMode === "map") {
+      panel.classList.add("map-mode");
+      mapEl.classList.remove("list-mode");
+      label.textContent = "Show List";
+      if (map) setTimeout(() => map.invalidateSize(), 100);
+    } else {
+      panel.classList.remove("map-mode");
+      mapEl.classList.add("list-mode");
+      label.textContent = "Show Map";
+    }
+  }
 
   // ---------- Login ----------
   async function login() {
@@ -259,18 +327,24 @@
   // ---------- Dashboard ----------
   async function showDashboard() {
     document.getElementById("loginScreen").style.display = "none";
-    document.getElementById("dashboard").style.display = "block";
+    document.getElementById("dashboard").style.display = "flex";
     initMap();
+    applyMobileView();
     await loadEmployees();
   }
 
   function initMap() {
     if (map) return;
-    map = L.map("map").setView([22.7788, 73.6142], 7); // default center (Gujarat area)
+    map = L.map("map", { zoomControl: true }).setView([22.7788, 73.6142], 7);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "&copy; OpenStreetMap contributors",
     }).addTo(map);
+    setTimeout(() => map.invalidateSize(), 200);
   }
+
+  window.addEventListener("resize", () => {
+    if (map) setTimeout(() => map.invalidateSize(), 100);
+  });
 
   async function loadEmployees() {
     try {
@@ -297,18 +371,20 @@
         ? new Date(u.lastLocation.timestamp).toLocaleString()
         : "Never";
       row.innerHTML = `
-        <div onclick="openDetail('${u.employeeId}')" style="flex:1">
-          <div class="name">${u.name} (${u.employeeId})</div>
-          <div class="sub">${u.role} · ${u.active ? "active" : "inactive"} · last seen: ${lastSeen}</div>
+        <div style="width:100%;">
+          <div onclick="openDetail('${u.employeeId}')">
+            <div class="name">${u.name} (${u.employeeId})</div>
+            <div class="sub">${u.role} · ${u.active ? "active" : "inactive"} · last seen: ${lastSeen}</div>
+          </div>
+          ${u.role !== "manager" ? `
+            <div class="emp-actions">
+              <button class="btn-live ${liveTrackingEmployeeId === u.employeeId ? 'active' : ''}" onclick="event.stopPropagation(); toggleLiveTracking('${u.employeeId}')">
+                ${liveTrackingEmployeeId === u.employeeId ? 'Stop Live' : 'Track Live'}
+              </button>
+              <button class="btn-edit" onclick="event.stopPropagation(); openDetail('${u.employeeId}')">Edit</button>
+              <button class="btn-remove" onclick="event.stopPropagation(); removeEmployee('${u.employeeId}')">Remove</button>
+            </div>` : ""}
         </div>
-        ${u.role !== "manager" ? `
-          <div class="emp-actions">
-            <button class="btn-live ${liveTrackingEmployeeId === u.employeeId ? 'active' : ''}" onclick="event.stopPropagation(); toggleLiveTracking('${u.employeeId}')">
-              ${liveTrackingEmployeeId === u.employeeId ? 'Stop Live' : 'Track Live'}
-            </button>
-            <button class="btn-edit" onclick="event.stopPropagation(); openDetail('${u.employeeId}')">Edit</button>
-            <button class="btn-remove" onclick="event.stopPropagation(); removeEmployee('${u.employeeId}')">Remove</button>
-          </div>` : ""}
       `;
       list.appendChild(row);
     });
@@ -323,7 +399,6 @@
     document.getElementById("dailyList").innerHTML = "";
 
     try {
-      // Get employee basic info from the already-loaded list
       const usersRes = await fetch(`${API_BASE}/api/auth/users`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -336,7 +411,6 @@
       document.getElementById("editRate").value = emp.ratePerKm || 0;
       document.getElementById("editPassword").value = "";
 
-      // Get daily summary for payroll view
       const dailyRes = await fetch(`${API_BASE}/api/reports/daily/${employeeId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -344,10 +418,10 @@
       if (!dailyRes.ok) throw new Error(dailyData.error || "Failed to load daily summary");
 
       document.getElementById("detailStats").innerHTML = `
-        Rate: ₹${dailyData.ratePerKm}/km &nbsp;|&nbsp;
-        <b style="color:#22c55e">Total Pay Due: ₹${dailyData.totals.pay}</b>
-        &nbsp;|&nbsp; Total Km: ${dailyData.totals.totalKm} (Billable: ${dailyData.totals.billableKm}, Personal: ${dailyData.totals.personalKm})
-        &nbsp;|&nbsp; <button class="btn-download" onclick="downloadReport('${employeeId}')">Download CSV</button>
+        <span>Rate: ₹${dailyData.ratePerKm}/km</span>
+        <span style="color:#22c55e; font-weight:bold;">Total Pay Due: ₹${dailyData.totals.pay}</span>
+        <span>Total Km: ${dailyData.totals.totalKm} (Billable: ${dailyData.totals.billableKm}, Personal: ${dailyData.totals.personalKm})</span>
+        <button class="btn-download" onclick="downloadReport('${employeeId}')">Download CSV</button>
       `;
 
       renderDailySummary(dailyData.days);
@@ -389,9 +463,8 @@
       return;
     }
     list.innerHTML = "";
-    // Most recent day first
     [...days].reverse().forEach((d, idx) => {
-      const realIdx = days.length - 1 - idx; // index into lastLoadedDays
+      const realIdx = days.length - 1 - idx;
       const inTime = d.punchInTime ? new Date(d.punchInTime).toLocaleTimeString() : "—";
       const outTime = d.punchOutTime ? new Date(d.punchOutTime).toLocaleTimeString() : "—";
       const row = document.createElement("div");
@@ -399,7 +472,7 @@
 
       const manualHtml = d.manualPunches.map((p) => `
         <div class="point-row">
-          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
             <div>
               <b>${p.type === "in" ? "PUNCH IN" : "PUNCH OUT"}</b> · ${new Date(p.timestamp).toLocaleTimeString()}<br>
               <span class="mono">${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)}</span><br>
@@ -412,7 +485,7 @@
 
       const autoHtml = d.autoPings.map((p) => `
         <div class="point-row">
-          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
             <div>
               <b>Auto point</b> · ${new Date(p.timestamp).toLocaleTimeString()} · ${p.cumulativeKm} km so far<br>
               <span class="mono">${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)}</span><br>
@@ -451,8 +524,6 @@
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to delete record");
-
-      // Refresh the currently open employee's detail view
       if (currentDetailEmployeeId) await openDetail(currentDetailEmployeeId);
     } catch (err) {
       alert(err.message);
@@ -472,19 +543,17 @@
     if (!day || !day.route.length) return;
 
     closeModal();
-
-    // Clear previous route drawing
-    if (routeLayerGroup) {
-      map.removeLayer(routeLayerGroup);
+    if (window.innerWidth <= 768) {
+      mobileViewMode = "map";
+      applyMobileView();
     }
+
+    if (routeLayerGroup) map.removeLayer(routeLayerGroup);
     routeLayerGroup = L.layerGroup().addTo(map);
 
     const latlngs = day.route.map((p) => [p.latitude, p.longitude]);
-
-    // Draw the path
     L.polyline(latlngs, { color: "#3b82f6", weight: 4 }).addTo(routeLayerGroup);
 
-    // Start marker (green)
     const startIcon = L.divIcon({
       html: '<div style="background:#22c55e;width:16px;height:16px;border-radius:50%;border:3px solid white;"></div>',
       className: "", iconSize: [16, 16],
@@ -493,7 +562,6 @@
       .addTo(routeLayerGroup)
       .bindPopup(`<b>Start</b><br>${new Date(day.route[0].timestamp).toLocaleTimeString()}<br>${day.route[0].latitude.toFixed(5)}, ${day.route[0].longitude.toFixed(5)}`);
 
-    // End marker (red) - only if more than one point
     if (latlngs.length > 1) {
       const endIcon = L.divIcon({
         html: '<div style="background:#ef4444;width:16px;height:16px;border-radius:50%;border:3px solid white;"></div>',
@@ -505,7 +573,10 @@
         .bindPopup(`<b>Last point</b><br>${new Date(last.timestamp).toLocaleTimeString()}<br>${last.latitude.toFixed(5)}, ${last.longitude.toFixed(5)}`);
     }
 
-    map.fitBounds(latlngs, { padding: [40, 40] });
+    setTimeout(() => {
+      map.invalidateSize();
+      map.fitBounds(latlngs, { padding: [40, 40] });
+    }, 150);
   }
 
   function closeModal() {
@@ -525,10 +596,7 @@
     try {
       const res = await fetch(`${API_BASE}/api/auth/users/${currentDetailEmployeeId}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(body),
       });
       const data = await res.json();
@@ -551,7 +619,6 @@
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to delete");
-
       closeModal();
       await loadEmployees();
     } catch (err) {
@@ -559,7 +626,7 @@
     }
   }
 
-  // ---------- Live Tracking (Swiggy/Zomato-style) ----------
+  // ---------- Live Tracking ----------
   let liveTrackingEmployeeId = null;
   let liveTrackingInterval = null;
   let liveRouteLayerGroup = null;
@@ -573,20 +640,21 @@
   }
 
   function startLiveTracking(employeeId) {
-    stopLiveTracking(); // clear any previous live session first
+    stopLiveTracking();
     liveTrackingEmployeeId = employeeId;
-
-    refreshLiveTrack(); // immediate first draw
-    liveTrackingInterval = setInterval(refreshLiveTrack, 20000); // refresh every 20s
-
-    loadEmployees(); // re-render list so button shows "Stop Live"
+    if (window.innerWidth <= 768) {
+      mobileViewMode = "map";
+      applyMobileView();
+    }
+    refreshLiveTrack();
+    liveTrackingInterval = setInterval(refreshLiveTrack, 20000);
+    loadEmployees();
   }
 
   function stopLiveTracking() {
     if (liveTrackingInterval) clearInterval(liveTrackingInterval);
     liveTrackingInterval = null;
     liveTrackingEmployeeId = null;
-
     if (liveRouteLayerGroup) {
       map.removeLayer(liveRouteLayerGroup);
       liveRouteLayerGroup = null;
@@ -596,21 +664,16 @@
 
   async function refreshLiveTrack() {
     if (!liveTrackingEmployeeId) return;
-
     try {
-      // Get just today's data
       const today = new Date();
       const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
-
       const res = await fetch(`${API_BASE}/api/reports/daily/${liveTrackingEmployeeId}?from=${startOfDay}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to load live track");
-
       const todayData = data.days.find((d) => d.date === toLocalDateKey(today));
-      if (!todayData || !todayData.route.length) return; // nothing yet today
-
+      if (!todayData || !todayData.route.length) return;
       drawLiveRoute(todayData.route);
     } catch (err) {
       console.log("Live tracking refresh failed:", err.message);
@@ -622,32 +685,29 @@
   }
 
   function drawLiveRoute(route) {
-    if (liveRouteLayerGroup) {
-      map.removeLayer(liveRouteLayerGroup);
-    }
+    if (liveRouteLayerGroup) map.removeLayer(liveRouteLayerGroup);
     liveRouteLayerGroup = L.layerGroup().addTo(map);
 
     const latlngs = route.map((p) => [p.latitude, p.longitude]);
-
     L.polyline(latlngs, { color: "#3b82f6", weight: 4, dashArray: "6,6" }).addTo(liveRouteLayerGroup);
 
-    // Pulsing current-position marker (last point)
     const currentIcon = L.divIcon({
-      html: '<div class="pulse-dot"></div>',
-      className: "", iconSize: [16, 16],
+      html: '<div class="pulse-dot"></div>', className: "", iconSize: [16, 16],
     });
     const last = route[route.length - 1];
     L.marker([last.latitude, last.longitude], { icon: currentIcon })
       .addTo(liveRouteLayerGroup)
       .bindPopup(`<b>Live position</b><br>Updated: ${new Date(last.timestamp).toLocaleTimeString()}<br>${last.latitude.toFixed(5)}, ${last.longitude.toFixed(5)}`);
 
-    map.setView([last.latitude, last.longitude], 13);
+    setTimeout(() => {
+      map.invalidateSize();
+      map.setView([last.latitude, last.longitude], 13);
+    }, 150);
   }
 
   function renderMapMarkers(users) {
     Object.values(markers).forEach((m) => map.removeLayer(m));
     markers = {};
-
     users.forEach((u) => {
       if (u.lastLocation?.latitude && u.lastLocation?.longitude) {
         const marker = L.marker([u.lastLocation.latitude, u.lastLocation.longitude])
@@ -672,10 +732,7 @@
     try {
       const res = await fetch(`${API_BASE}/api/auth/users`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ employeeId, name, password, ratePerKm }),
       });
       const data = await res.json();
@@ -706,13 +763,8 @@
     }
   }
 
-  // Auto-login if token already saved, and refresh every 30s for live tracking
-  if (token) {
-    showDashboard();
-  }
-  setInterval(() => {
-    if (token) loadEmployees();
-  }, 30000);
+  if (token) showDashboard();
+  setInterval(() => { if (token) loadEmployees(); }, 30000);
 </script>
 </body>
 </html>
