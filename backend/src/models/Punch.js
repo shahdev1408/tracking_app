@@ -11,7 +11,14 @@ const punchSchema = new mongoose.Schema({
   isSunday: { type: Boolean, default: false },
   isOfficeHours: { type: Boolean, default: false },
   billable: { type: Boolean, default: false },
-  placeName: { type: String }, // human-readable address from reverse geocoding // computed from rules
+  placeName: { type: String }, // human-readable address from reverse geocoding
+
+  // New fields:
+  punchCategory: { type: String, enum: ["personal", "project"], default: "project" },
+  workType: { type: String, enum: ["site_work", "office_work", "meeting", "tour", null], default: null },
+  photoBase64: { type: String }, // captured photo, stored as base64 data URL
+  deviceName: { type: String },  // e.g. "Samsung Galaxy M31"
+  deviceId: { type: String },    // Android ID (not true IMEI - Android blocks that since Android 10)
 }, { timestamps: true });
 
 module.exports = mongoose.model("Punch", punchSchema);

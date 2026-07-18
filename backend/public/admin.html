@@ -78,7 +78,7 @@
     background: #22c55e; color: white; font-weight: bold; cursor: pointer; font-size: 14px;
   }
 
-  .emp-actions { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 8px; }
+  .emp-actions { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
   .emp-actions button {
     font-size: 11px; padding: 8px 10px; border: none; border-radius: 6px; cursor: pointer;
   }
@@ -86,6 +86,23 @@
   .btn-remove { background: #ef4444; color: white; }
   .btn-live { background: #f59e0b; color: white; }
   .btn-live.active { background: #ef4444; }
+
+  /* ---------- Enable/Disable toggle switch ---------- */
+  .toggle-switch { position: relative; width: 40px; height: 22px; display: inline-block; flex-shrink: 0; cursor: pointer; }
+  .toggle-switch input { display: none; }
+  .toggle-slider {
+    position: absolute; inset: 0; background: #64748b; border-radius: 22px; transition: 0.2s;
+  }
+  .toggle-slider::before {
+    content: ""; position: absolute; width: 18px; height: 18px; left: 2px; top: 2px;
+    background: white; border-radius: 50%; transition: 0.2s;
+  }
+  .toggle-switch input:checked + .toggle-slider { background: #22c55e; }
+  .toggle-switch input:checked + .toggle-slider::before { transform: translateX(18px); }
+
+  .status-pill { padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: bold; }
+  .status-pill.on { background: #14532d; color: #4ade80; }
+  .status-pill.off { background: #450a0a; color: #f87171; }
 
   /* ---------- Modal ---------- */
   .modal-overlay {
@@ -117,6 +134,25 @@
 
   .detail-stats-row { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: #94a3b8; margin-bottom: 12px; }
 
+  /* ---------- Enable/Disable + anchor points + schedule section in modal ---------- */
+  .settings-block { background: #0b1220; padding: 14px; border-radius: 8px; margin: 10px 0; }
+  .settings-block h4 { margin: 0 0 8px 0; font-size: 12px; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px; }
+  .settings-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .settings-row label { font-size: 13px; color: #cbd5e1; min-width: 90px; }
+  .coord-input {
+    flex: 1; padding: 10px; border-radius: 6px; border: none;
+    background: #1e293b; color: #f1f5f9; font-size: 13px; min-width: 0;
+  }
+  .day-chip {
+    display: inline-flex; align-items: center; gap: 4px; margin-right: 10px; margin-bottom: 6px;
+    font-size: 12px; color: #cbd5e1;
+  }
+  .day-chip input { accent-color: #22c55e; width: 16px; height: 16px; }
+  .time-row { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+  .time-row input[type=time] {
+    padding: 8px; border-radius: 6px; border: none; background: #1e293b; color: #f1f5f9; font-size: 13px;
+  }
+
   /* ---------- Daily summary rows ---------- */
   .day-row {
     background: #0b1220; padding: 12px; border-radius: 8px; margin-bottom: 10px; font-size: 13px;
@@ -147,6 +183,15 @@
   }
   .btn-delete-point:hover { background: #ef4444; color: white; }
 
+  .punch-photo {
+    width: 48px; height: 48px; object-fit: cover; border-radius: 6px; cursor: pointer;
+    background: #1e293b; margin-top: 6px; display: block;
+  }
+  .cat-tag { display: inline-block; padding: 2px 7px; border-radius: 6px; font-size: 10px; font-weight: bold; margin-right: 6px; }
+  .cat-tag.project { background: #1e3a8a; color: #93c5fd; }
+  .cat-tag.personal { background: #713f12; color: #fcd34d; }
+  .device-tag { color: #64748b; font-size: 10px; display: block; margin-top: 3px; }
+
   .pulse-dot {
     width: 16px; height: 16px; border-radius: 50%; background: #3b82f6;
     border: 3px solid white; box-shadow: 0 0 0 rgba(59,130,246,0.6);
@@ -157,6 +202,14 @@
     70% { box-shadow: 0 0 0 12px rgba(59,130,246,0); }
     100% { box-shadow: 0 0 0 0 rgba(59,130,246,0); }
   }
+
+  /* ---------- Photo zoom modal ---------- */
+  #photoModal {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: flex;
+    align-items: center; justify-content: center; z-index: 10000; padding: 20px;
+  }
+  #photoModal img { max-width: 92vw; max-height: 92vh; border-radius: 10px; }
+  #photoModal .close-x { position: absolute; top: 18px; right: 24px; color: white; font-size: 32px; cursor: pointer; }
 
   /* Leaflet control sizing - bigger touch targets on all devices */
   .leaflet-control-zoom a { width: 36px !important; height: 36px !important; line-height: 36px !important; font-size: 18px !important; }
@@ -253,6 +306,48 @@
     <input id="editPhone" placeholder="Phone (optional)" />
     <input id="editRate" type="number" step="0.01" placeholder="Pay Rate per Km (e.g. 10)" />
     <input id="editPassword" type="password" placeholder="New Password (leave blank to keep current)" />
+
+    <div class="settings-block">
+      <h4>Account Status</h4>
+      <div class="settings-row">
+        <label class="toggle-switch">
+          <input type="checkbox" id="editActive" />
+          <span class="toggle-slider"></span>
+        </label>
+        <span id="editActiveLabel" style="font-size:13px; color:#cbd5e1;">Enabled — can punch in/ping</span>
+      </div>
+    </div>
+
+    <div class="settings-block">
+      <h4>Start Point &amp; End Point (used for Km/Pay calculation)</h4>
+      <div class="settings-row">
+        <label>Start Point</label>
+        <input class="coord-input" id="editStartLat" placeholder="latitude" />
+        <input class="coord-input" id="editStartLng" placeholder="longitude" />
+      </div>
+      <div class="settings-row">
+        <label>End Point</label>
+        <input class="coord-input" id="editEndLat" placeholder="latitude" />
+        <input class="coord-input" id="editEndLng" placeholder="longitude" />
+      </div>
+    </div>
+
+    <div class="settings-block">
+      <h4>Auto-Tracking Schedule (silent background tracking, independent of Punch In/Out)</h4>
+      <div id="scheduleDays"></div>
+      <div class="time-row">
+        Start <input type="time" id="scheduleStart" />
+        End <input type="time" id="scheduleEnd" />
+      </div>
+      <div class="settings-row" style="margin-top:8px;">
+        <label class="toggle-switch">
+          <input type="checkbox" id="scheduleEnabled" />
+          <span class="toggle-slider"></span>
+        </label>
+        <span style="font-size:13px; color:#cbd5e1;">Schedule active</span>
+      </div>
+    </div>
+
     <div class="modal-actions">
       <button class="btn-save" onclick="saveEdit()">Save Changes</button>
       <button class="btn-cancel" onclick="closeModal()">Close</button>
@@ -263,12 +358,19 @@
   </div>
 </div>
 
+<!-- PHOTO ZOOM MODAL -->
+<div id="photoModal" class="hidden" onclick="closePhotoModal()">
+  <span class="close-x">&times;</span>
+  <img id="photoModalImg" src="" />
+</div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
   const API_BASE = window.location.origin;
   let token = localStorage.getItem("adminToken") || "";
   let map, markers = {};
   let mobileViewMode = "list"; // "list" or "map" - only relevant on small screens
+  const DAYS = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"];
 
   // ---------- Mobile view switch ----------
   function toggleMobileView() {
@@ -350,6 +452,8 @@
     if (map) setTimeout(() => map.invalidateSize(), 100);
   });
 
+  let allUsers = [];
+
   async function loadEmployees() {
     try {
       const res = await fetch(`${API_BASE}/api/auth/users`, {
@@ -358,6 +462,7 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to load employees");
 
+      allUsers = data.users;
       renderEmployeeList(data.users);
       renderMapMarkers(data.users);
     } catch (err) {
@@ -378,10 +483,15 @@
         <div style="width:100%;">
           <div onclick="openDetail('${u.employeeId}')">
             <div class="name">${u.name} (${u.employeeId})</div>
-            <div class="sub">${u.role} · ${u.active ? "active" : "inactive"} · last seen: ${lastSeen}</div>
+            <div class="sub">${u.role} · last seen: ${lastSeen}</div>
           </div>
           ${u.role !== "manager" ? `
             <div class="emp-actions">
+              <label class="toggle-switch" onclick="event.stopPropagation()">
+                <input type="checkbox" ${u.active ? "checked" : ""} onchange="toggleActive('${u.employeeId}', this.checked)">
+                <span class="toggle-slider"></span>
+              </label>
+              <span class="status-pill ${u.active ? "on" : "off"}">${u.active ? "Enabled" : "Disabled"}</span>
               <button class="btn-live ${liveTrackingEmployeeId === u.employeeId ? 'active' : ''}" onclick="event.stopPropagation(); toggleLiveTracking('${u.employeeId}')">
                 ${liveTrackingEmployeeId === u.employeeId ? 'Stop Live' : 'Track Live'}
               </button>
@@ -392,6 +502,23 @@
       `;
       list.appendChild(row);
     });
+  }
+
+  // Quick enable/disable straight from the list toggle
+  async function toggleActive(employeeId, active) {
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/users/${employeeId}/toggle-active`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ active }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update status");
+      await loadEmployees();
+    } catch (err) {
+      alert(err.message);
+      await loadEmployees(); // revert the toggle visually if it failed
+    }
   }
 
   let currentDetailEmployeeId = null;
@@ -414,6 +541,37 @@
       document.getElementById("editPhone").value = emp.phone || "";
       document.getElementById("editRate").value = emp.ratePerKm || 0;
       document.getElementById("editPassword").value = "";
+
+      // Enable/Disable
+      document.getElementById("editActive").checked = !!emp.active;
+      document.getElementById("editActiveLabel").textContent = emp.active
+        ? "Enabled — can punch in/ping"
+        : "Disabled — cannot punch in/ping";
+      document.getElementById("editActive").onchange = (e) => {
+        document.getElementById("editActiveLabel").textContent = e.target.checked
+          ? "Enabled — can punch in/ping"
+          : "Disabled — cannot punch in/ping";
+      };
+
+      // Start/End point
+      const sp = emp.startPoint || {};
+      const ep = emp.endPoint || {};
+      document.getElementById("editStartLat").value = sp.latitude ?? "";
+      document.getElementById("editStartLng").value = sp.longitude ?? "";
+      document.getElementById("editEndLat").value = ep.latitude ?? "";
+      document.getElementById("editEndLng").value = ep.longitude ?? "";
+
+      // Schedule
+      const sched = emp.autoSchedule || { enabled: false, days: [], startTime: "08:00", endTime: "20:00" };
+      const dayBox = document.getElementById("scheduleDays");
+      dayBox.innerHTML = DAYS.map(d => `
+        <label class="day-chip">
+          <input type="checkbox" id="day-${d}" ${sched.days.includes(d) ? "checked" : ""}/> ${d.slice(0,3)}
+        </label>
+      `).join("");
+      document.getElementById("scheduleStart").value = sched.startTime || "08:00";
+      document.getElementById("scheduleEnd").value = sched.endTime || "20:00";
+      document.getElementById("scheduleEnabled").checked = !!sched.enabled;
 
       const dailyRes = await fetch(`${API_BASE}/api/reports/daily/${employeeId}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -478,9 +636,12 @@
         <div class="point-row">
           <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
             <div>
-              <b>${p.type === "in" ? "PUNCH IN" : "PUNCH OUT"}</b> · ${new Date(p.timestamp).toLocaleTimeString()}<br>
-              <span class="mono">${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)}</span><br>
+              <b>${p.type === "in" ? "PUNCH IN" : "PUNCH OUT"}</b> · ${new Date(p.timestamp).toLocaleTimeString()}
+              ${p.punchCategory ? `<div style="margin-top:4px;"><span class="cat-tag ${p.punchCategory}">${p.punchCategory}${p.workType ? " · " + p.workType : ""}</span></div>` : ""}
+              <br><span class="mono">${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)}</span><br>
               ${p.placeName ? `<span class="place">${p.placeName}</span>` : ""}
+              ${(p.deviceName || p.deviceId) ? `<span class="device-tag">Device: ${p.deviceName || "unknown"} ${p.deviceId ? "· " + p.deviceId : ""}</span>` : ""}
+              ${p.photoBase64 ? `<img class="punch-photo" src="${p.photoBase64}" onclick="showPhoto('${p.photoBase64}')" />` : ""}
             </div>
             <button class="btn-delete-point" onclick="deleteRecord('punch', '${p._id}')">✕</button>
           </div>
@@ -494,6 +655,7 @@
               <b>Auto point</b> · ${new Date(p.timestamp).toLocaleTimeString()} · ${p.cumulativeKm} km so far<br>
               <span class="mono">${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)}</span><br>
               ${p.placeName ? `<span class="place">${p.placeName}</span>` : ""}
+              ${(p.deviceName || p.deviceId) ? `<span class="device-tag">Device: ${p.deviceName || "unknown"} ${p.deviceId ? "· " + p.deviceId : ""}</span>` : ""}
             </div>
             <button class="btn-delete-point" onclick="deleteRecord('ping', '${p._id}')">✕</button>
           </div>
@@ -538,6 +700,15 @@
     const body = el.nextElementSibling;
     body.classList.toggle("hidden");
     el.textContent = el.textContent.replace(el.textContent[0], body.classList.contains("hidden") ? "▸" : "▾");
+  }
+
+  // ---------- Photo zoom ----------
+  function showPhoto(src) {
+    document.getElementById("photoModalImg").src = src;
+    document.getElementById("photoModal").classList.remove("hidden");
+  }
+  function closePhotoModal() {
+    document.getElementById("photoModal").classList.add("hidden");
   }
 
   let routeLayerGroup = null;
@@ -619,9 +790,17 @@
     const phone = document.getElementById("editPhone").value.trim();
     const ratePerKm = parseFloat(document.getElementById("editRate").value) || 0;
     const password = document.getElementById("editPassword").value;
+    const active = document.getElementById("editActive").checked;
 
-    const body = { name, phone, ratePerKm };
+    const startLat = parseFloat(document.getElementById("editStartLat").value);
+    const startLng = parseFloat(document.getElementById("editStartLng").value);
+    const endLat = parseFloat(document.getElementById("editEndLat").value);
+    const endLng = parseFloat(document.getElementById("editEndLng").value);
+
+    const body = { name, phone, ratePerKm, active };
     if (password) body.password = password;
+    if (!isNaN(startLat) && !isNaN(startLng)) body.startPoint = { latitude: startLat, longitude: startLng };
+    if (!isNaN(endLat) && !isNaN(endLng)) body.endPoint = { latitude: endLat, longitude: endLng };
 
     try {
       const res = await fetch(`${API_BASE}/api/auth/users/${currentDetailEmployeeId}`, {
@@ -631,6 +810,20 @@
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to save changes");
+
+      // Save the auto-tracking schedule separately
+      const days = DAYS.filter(d => document.getElementById(`day-${d}`).checked);
+      const startTime = document.getElementById("scheduleStart").value;
+      const endTime = document.getElementById("scheduleEnd").value;
+      const enabled = document.getElementById("scheduleEnabled").checked;
+
+      const schedRes = await fetch(`${API_BASE}/api/auth/users/${currentDetailEmployeeId}/schedule`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ enabled, days, startTime, endTime }),
+      });
+      const schedData = await schedRes.json();
+      if (!schedRes.ok) throw new Error(schedData.error || "Failed to save schedule");
 
       alert("Saved successfully");
       closeModal();

@@ -6,11 +6,13 @@ const { evaluatePoint } = require("../utils/payRules");
 const { requireAuth, requireManager } = require("../middleware/auth");
 const { reverseGeocode } = require("../utils/geocode");
 
-// POST /api/punch  — employee taps "punch in" or "punch out" on the app
 router.post("/", requireAuth, async (req, res) => {
   try {
-    const employeeId = req.user.employeeId; // from logged-in token, not request body
-    const { type, site, location, latitude, longitude, timestamp } = req.body;
+    const employeeId = req.user.employeeId;
+    const {
+      type, site, location, latitude, longitude, timestamp,
+      punchCategory, workType, photoBase64, deviceName, deviceId,
+    } = req.body;
 
     if (!type || latitude == null || longitude == null) {
       return res.status(400).json({ error: "type, latitude, longitude are required" });
@@ -20,26 +22,26 @@ router.post("/", requireAuth, async (req, res) => {
     }
 
     const emp = await User.findOne({ employeeId });
+    if (!emp || !emp.active) {
+      return res.status(403).json({ error: "This account has been disabled by your manager" });
+    }
+
     const ts = timestamp ? new Date(timestamp) : new Date();
-
-    const { isSunday, isOfficeHours, billable } = evaluatePoint(
-      ts,
-      emp?.officeStartTime,
-      emp?.officeEndTime
-    );
-
-    // Look up the place name (won't block/slow the response if it's slow or fails)
+    const { isSunday, isOfficeHours, billable } = evaluatePoint(ts, emp?.officeStartTime, emp?.officeEndTime);
     const placeName = await reverseGeocode(latitude, longitude);
 
     const punch = await Punch.create({
-      employeeId, type, site, location, latitude, longitude,
-      timestamp: ts, isSunday, isOfficeHours, billable, placeName,
+      employeeId, type, site, location, latitude, longitude, timestamp: ts,
+      isSunday, isOfficeHours, billable, placeName,
+      punchCategory, workType, photoBase64, deviceName, deviceId,
     });
 
-    // Also update last known location so manager's live map reflects punches too
     await User.updateOne(
       { employeeId },
-      { lastLocation: { latitude, longitude, timestamp: ts, placeName } }
+      {
+        lastLocation: { latitude, longitude, timestamp: ts, placeName },
+        lastDevice: { deviceName, deviceId, timestamp: ts },
+      }
     );
 
     res.status(201).json({ message: "Punch recorded", punch });
@@ -48,7 +50,6 @@ router.post("/", requireAuth, async (req, res) => {
   }
 });
 
-// GET /api/punch/:employeeId — list punches for an employee (optional ?from=&to=)
 router.get("/:employeeId", requireAuth, async (req, res) => {
   try {
     const { employeeId } = req.params;
@@ -66,7 +67,6 @@ router.get("/:employeeId", requireAuth, async (req, res) => {
   }
 });
 
-// DELETE /api/punch/record/:punchId — manager deletes one specific punch entry (e.g. test data, mistakes)
 router.delete("/record/:punchId", requireAuth, requireManager, async (req, res) => {
   try {
     const deleted = await Punch.findByIdAndDelete(req.params.punchId);

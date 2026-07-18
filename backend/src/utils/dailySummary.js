@@ -1,20 +1,12 @@
 const { totalDistanceKm, haversineKm } = require("./distance");
 
-/**
- * Groups pings by calendar day (in local server time) and computes,
- * for each day: first activity time, last activity time, total km,
- * billable km, personal km, and number of tracking points.
- *
- * This is the core payroll data: "employee worked from X to Y today,
- * travelled Z km which is billable/personal."
- */
 function toDateKey(date) {
   const d = new Date(date);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 function buildDailySummary(pings, punches, ratePerKm = 0) {
-  const dayMap = {}; // dateKey -> { pings: [], punches: [] }
+  const dayMap = {};
 
   pings.forEach((p) => {
     const key = toDateKey(p.timestamp);
@@ -33,11 +25,9 @@ function buildDailySummary(pings, punches, ratePerKm = 0) {
     .map((dateKey) => {
       const { pings: dayPings, punches: dayPunches } = dayMap[dateKey];
 
-      // Sort by time
       dayPings.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
       dayPunches.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-      // First and last activity of the day (across pings + punches combined)
       const allTimestamps = [
         ...dayPings.map((p) => new Date(p.timestamp)),
         ...dayPunches.map((p) => new Date(p.timestamp)),
@@ -57,8 +47,6 @@ function buildDailySummary(pings, punches, ratePerKm = 0) {
       const totalKm = totalDistanceKm(dayPings);
       const pay = Number((billableKm * ratePerKm).toFixed(2));
 
-      // Build route with cumulative distance at each point (like a fitness app
-      // showing "at the 2km mark, you were here") - useful for verifying travel.
       let cumulativeKm = 0;
       const routeWithDistance = dayPings.map((p, i) => {
         if (i > 0) {
@@ -73,6 +61,8 @@ function buildDailySummary(pings, punches, ratePerKm = 0) {
           billable: p.billable,
           placeName: p.placeName || null,
           cumulativeKm: Number(cumulativeKm.toFixed(2)),
+          deviceName: p.deviceName || null,
+          deviceId: p.deviceId || null,
         };
       });
 
@@ -89,7 +79,6 @@ function buildDailySummary(pings, punches, ratePerKm = 0) {
         pay,
         pingCount: dayPings.length,
         punchCount: dayPunches.length,
-        // Full detail lists - kept SEPARATE so manual and auto never get confused
         manualPunches: dayPunches.map((p) => ({
           _id: p._id,
           type: p.type,
@@ -98,14 +87,17 @@ function buildDailySummary(pings, punches, ratePerKm = 0) {
           longitude: p.longitude,
           placeName: p.placeName || null,
           billable: p.billable,
+          punchCategory: p.punchCategory || null,
+          workType: p.workType || null,
+          photoBase64: p.photoBase64 || null,
+          deviceName: p.deviceName || null,
+          deviceId: p.deviceId || null,
         })),
         autoPings: routeWithDistance,
-        // Kept for map drawing (same data as autoPings, simple shape)
         route: routeWithDistance,
       };
     });
 
-  // Grand totals across the whole date range - useful for a payroll period summary
   const totals = summary.reduce(
     (acc, d) => ({
       totalKm: acc.totalKm + d.totalKm,

@@ -11,12 +11,10 @@ const authRoutes = require("./routes/auth");
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "10mb" })); // higher limit to allow base64 photo uploads
 
-// Serve the admin dashboard (public/admin.html) as static files
 app.use(express.static(path.join(__dirname, "../public")));
 
-// Health check
 app.get("/", (req, res) => {
   res.json({ status: "ok", message: "Tracking app backend running" });
 });

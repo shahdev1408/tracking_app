@@ -6,36 +6,35 @@ const { evaluatePoint } = require("../utils/payRules");
 const { requireAuth, requireManager } = require("../middleware/auth");
 const { reverseGeocode } = require("../utils/geocode");
 
-// POST /api/tracking/ping — mobile app calls this automatically (every 1km moved or 15-30 min)
 router.post("/ping", requireAuth, async (req, res) => {
   try {
-    const employeeId = req.user.employeeId; // taken from the logged-in token, not the request body
-    const { latitude, longitude, timestamp } = req.body;
+    const employeeId = req.user.employeeId;
+    const { latitude, longitude, timestamp, deviceName, deviceId } = req.body;
 
     if (latitude == null || longitude == null) {
       return res.status(400).json({ error: "latitude, longitude are required" });
     }
 
     const emp = await User.findOne({ employeeId });
+    if (!emp || !emp.active) {
+      return res.status(403).json({ error: "This account has been disabled by your manager" });
+    }
+
     const ts = timestamp ? new Date(timestamp) : new Date();
-
-    const { isSunday, isOfficeHours, billable } = evaluatePoint(
-      ts,
-      emp?.officeStartTime,
-      emp?.officeEndTime
-    );
-
+    const { isSunday, isOfficeHours, billable } = evaluatePoint(ts, emp?.officeStartTime, emp?.officeEndTime);
     const placeName = await reverseGeocode(latitude, longitude);
 
     const ping = await Ping.create({
       employeeId, latitude, longitude, timestamp: ts,
-      isSunday, isOfficeHours, billable, placeName,
+      isSunday, isOfficeHours, billable, placeName, deviceName, deviceId,
     });
 
-    // Update the employee's last known location (for the manager's live map)
     await User.updateOne(
       { employeeId },
-      { lastLocation: { latitude, longitude, timestamp: ts, placeName } }
+      {
+        lastLocation: { latitude, longitude, timestamp: ts, placeName },
+        lastDevice: { deviceName, deviceId, timestamp: ts },
+      }
     );
 
     res.status(201).json({ message: "Ping recorded", ping });
@@ -44,7 +43,6 @@ router.post("/ping", requireAuth, async (req, res) => {
   }
 });
 
-// GET /api/tracking/:employeeId — list pings for an employee (optional ?from=&to=)
 router.get("/:employeeId", requireAuth, async (req, res) => {
   try {
     const { employeeId } = req.params;
@@ -62,7 +60,6 @@ router.get("/:employeeId", requireAuth, async (req, res) => {
   }
 });
 
-// DELETE /api/tracking/record/:pingId — manager deletes one specific auto-track point
 router.delete("/record/:pingId", requireAuth, requireManager, async (req, res) => {
   try {
     const deleted = await Ping.findByIdAndDelete(req.params.pingId);
