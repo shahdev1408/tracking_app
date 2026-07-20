@@ -339,6 +339,19 @@
         Start <input type="time" id="scheduleStart" />
         End <input type="time" id="scheduleEnd" />
       </div>
+      <div class="settings-row" style="align-items:center;">
+        <label style="min-width:110px; color:#cbd5e1;">Ping every</label>
+        <input list="scheduleIntervalOptions" id="scheduleInterval" class="coord-input" type="number" min="1" step="1" placeholder="minutes" style="max-width:140px;" />
+        <datalist id="scheduleIntervalOptions">
+          <option value="5">5 min</option>
+          <option value="15">15 min</option>
+          <option value="30">30 min</option>
+          <option value="60">1 hour</option>
+          <option value="120">2 hours</option>
+          <option value="180">3 hours</option>
+        </datalist>
+        <span style="font-size:13px; color:#cbd5e1; margin-left:8px;">minutes</span>
+      </div>
       <div class="settings-row" style="margin-top:8px;">
         <label class="toggle-switch">
           <input type="checkbox" id="scheduleEnabled" />
@@ -479,11 +492,15 @@
       const lastSeen = u.lastLocation?.timestamp
         ? new Date(u.lastLocation.timestamp).toLocaleString()
         : "Never";
+      const loginDevice = u.lastDevice?.deviceName || u.lastDevice?.deviceId
+        ? `${u.lastDevice.deviceName || "unknown"}${u.lastDevice.deviceId ? " · " + u.lastDevice.deviceId : ""}`
+        : "No login recorded";
       row.innerHTML = `
         <div style="width:100%;">
           <div onclick="openDetail('${u.employeeId}')">
             <div class="name">${u.name} (${u.employeeId})</div>
             <div class="sub">${u.role} · last seen: ${lastSeen}</div>
+            <div class="sub">Last login device: ${loginDevice}</div>
           </div>
           ${u.role !== "manager" ? `
             <div class="emp-actions">
@@ -562,7 +579,7 @@
       document.getElementById("editEndLng").value = ep.longitude ?? "";
 
       // Schedule
-      const sched = emp.autoSchedule || { enabled: false, days: [], startTime: "08:00", endTime: "20:00" };
+      const sched = emp.autoSchedule || { enabled: false, days: [], startTime: "08:00", endTime: "20:00", intervalMinutes: 30 };
       const dayBox = document.getElementById("scheduleDays");
       dayBox.innerHTML = DAYS.map(d => `
         <label class="day-chip">
@@ -571,6 +588,7 @@
       `).join("");
       document.getElementById("scheduleStart").value = sched.startTime || "08:00";
       document.getElementById("scheduleEnd").value = sched.endTime || "20:00";
+      document.getElementById("scheduleInterval").value = sched.intervalMinutes || 30;
       document.getElementById("scheduleEnabled").checked = !!sched.enabled;
 
       const dailyRes = await fetch(`${API_BASE}/api/reports/daily/${employeeId}`, {
@@ -755,23 +773,36 @@
     const snapped = await snapRouteToRoads(latlngs);
     L.polyline(snapped || latlngs, { color: "#3b82f6", weight: 4 }).addTo(routeLayerGroup);
 
+    const first = day.route[0];
+    const isFirstAnchor = first.kind === "start_point";
+
+    // Fixed Start Point anchors are drawn as an orange "base" marker so
+    // they're visually distinct from a real recorded GPS point.
     const startIcon = L.divIcon({
-      html: '<div style="background:#22c55e;width:16px;height:16px;border-radius:50%;border:3px solid white;"></div>',
-      className: "", iconSize: [16, 16],
+      html: isFirstAnchor
+        ? '<div style="background:#f59e0b;width:20px;height:20px;border-radius:50%;border:3px solid white;display:flex;align-items:center;justify-content:center;font-size:11px;">🏠</div>'
+        : '<div style="background:#22c55e;width:16px;height:16px;border-radius:50%;border:3px solid white;"></div>',
+      className: "", iconSize: isFirstAnchor ? [20, 20] : [16, 16],
     });
-    L.marker(latlngs[0], { icon: startIcon })
-      .addTo(routeLayerGroup)
-      .bindPopup(`<b>Start</b><br>${new Date(day.route[0].timestamp).toLocaleTimeString()}<br>${day.route[0].latitude.toFixed(5)}, ${day.route[0].longitude.toFixed(5)}`);
+    const startLabel = isFirstAnchor
+      ? `<b>🏠 Base (Start Point)</b><br>Fixed anchor set by manager<br>${first.latitude.toFixed(5)}, ${first.longitude.toFixed(5)}`
+      : `<b>Start</b><br>${new Date(first.timestamp).toLocaleTimeString()}<br>${first.latitude.toFixed(5)}, ${first.longitude.toFixed(5)}`;
+    L.marker(latlngs[0], { icon: startIcon }).addTo(routeLayerGroup).bindPopup(startLabel);
 
     if (latlngs.length > 1) {
-      const endIcon = L.divIcon({
-        html: '<div style="background:#ef4444;width:16px;height:16px;border-radius:50%;border:3px solid white;"></div>',
-        className: "", iconSize: [16, 16],
-      });
       const last = day.route[day.route.length - 1];
-      L.marker(latlngs[latlngs.length - 1], { icon: endIcon })
-        .addTo(routeLayerGroup)
-        .bindPopup(`<b>Last point</b><br>${new Date(last.timestamp).toLocaleTimeString()}<br>${last.latitude.toFixed(5)}, ${last.longitude.toFixed(5)}`);
+      const isLastAnchor = last.kind === "end_point";
+
+      const endIcon = L.divIcon({
+        html: isLastAnchor
+          ? '<div style="background:#f59e0b;width:20px;height:20px;border-radius:50%;border:3px solid white;display:flex;align-items:center;justify-content:center;font-size:11px;">🏠</div>'
+          : '<div style="background:#ef4444;width:16px;height:16px;border-radius:50%;border:3px solid white;"></div>',
+        className: "", iconSize: isLastAnchor ? [20, 20] : [16, 16],
+      });
+      const endLabel = isLastAnchor
+        ? `<b>🏠 Base (End Point)</b><br>Fixed anchor set by manager<br>${last.latitude.toFixed(5)}, ${last.longitude.toFixed(5)}`
+        : `<b>Last point</b><br>${new Date(last.timestamp).toLocaleTimeString()}<br>${last.latitude.toFixed(5)}, ${last.longitude.toFixed(5)}`;
+      L.marker(latlngs[latlngs.length - 1], { icon: endIcon }).addTo(routeLayerGroup).bindPopup(endLabel);
     }
 
     setTimeout(() => {
@@ -815,12 +846,13 @@
       const days = DAYS.filter(d => document.getElementById(`day-${d}`).checked);
       const startTime = document.getElementById("scheduleStart").value;
       const endTime = document.getElementById("scheduleEnd").value;
+      const intervalMinutes = parseInt(document.getElementById("scheduleInterval").value, 10) || 30;
       const enabled = document.getElementById("scheduleEnabled").checked;
 
       const schedRes = await fetch(`${API_BASE}/api/auth/users/${currentDetailEmployeeId}/schedule`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ enabled, days, startTime, endTime }),
+        body: JSON.stringify({ enabled, days, startTime, endTime, intervalMinutes }),
       });
       const schedData = await schedRes.json();
       if (!schedRes.ok) throw new Error(schedData.error || "Failed to save schedule");
@@ -929,6 +961,13 @@
     }, 150);
   }
 
+  function homeIcon(color) {
+    return L.divIcon({
+      html: `<div style="background:${color};width:20px;height:20px;border-radius:50%;border:3px solid white;display:flex;align-items:center;justify-content:center;font-size:11px;">🏠</div>`,
+      className: "", iconSize: [20, 20],
+    });
+  }
+
   function renderMapMarkers(users) {
     Object.values(markers).forEach((m) => map.removeLayer(m));
     markers = {};
@@ -938,6 +977,27 @@
           .addTo(map)
           .bindPopup(`<b>${u.name}</b><br>${u.employeeId}<br>${new Date(u.lastLocation.timestamp).toLocaleString()}<br>${u.lastLocation.latitude.toFixed(5)}, ${u.lastLocation.longitude.toFixed(5)}`);
         markers[u.employeeId] = marker;
+      }
+
+      // Permanent Start/End Point (home base) markers - always shown,
+      // separate from the "last known location" pin above.
+      const sp = u.startPoint;
+      if (sp?.latitude != null && sp?.longitude != null) {
+        const spMarker = L.marker([sp.latitude, sp.longitude], { icon: homeIcon("#f59e0b") })
+          .addTo(map)
+          .bindPopup(`<b>🏠 ${u.name} - Start Point</b><br>${u.employeeId}<br>${sp.latitude.toFixed(5)}, ${sp.longitude.toFixed(5)}`);
+        markers[`${u.employeeId}_start`] = spMarker;
+      }
+      const ep = u.endPoint;
+      if (ep?.latitude != null && ep?.longitude != null) {
+        // If Start and End are the same coordinate, skip a duplicate pin
+        // sitting exactly on top of the Start marker.
+        if (!sp || sp.latitude !== ep.latitude || sp.longitude !== ep.longitude) {
+          const epMarker = L.marker([ep.latitude, ep.longitude], { icon: homeIcon("#a855f7") })
+            .addTo(map)
+            .bindPopup(`<b>🏠 ${u.name} - End Point</b><br>${u.employeeId}<br>${ep.latitude.toFixed(5)}, ${ep.longitude.toFixed(5)}`);
+          markers[`${u.employeeId}_end`] = epMarker;
+        }
       }
     });
   }
@@ -974,7 +1034,7 @@
     }
   }
 
-  async function removeEmployee(employeeId) {
+  async function removeEmployee(employeeId)   {
     if (!confirm(`Remove ${employeeId}? They will no longer be able to log in.`)) return;
     try {
       const res = await fetch(`${API_BASE}/api/auth/users/${employeeId}`, {

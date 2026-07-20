@@ -29,6 +29,7 @@ const userSchema = new mongoose.Schema({
     days: { type: [String], default: [] }, // e.g. ["monday","tuesday","wednesday"]
     startTime: { type: String, default: "08:00" }, // "HH:MM" 24hr
     endTime: { type: String, default: "20:00" },
+    intervalMinutes: { type: Number, default: 30 }, // background ping interval
   },
 }, { timestamps: true });
 

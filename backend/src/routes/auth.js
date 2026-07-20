@@ -28,7 +28,7 @@ router.post("/register", async (req, res) => {
 
 router.post("/login", async (req, res) => {
   try {
-    const { employeeId, password } = req.body;
+    const { employeeId, password, deviceName, deviceId } = req.body;
     if (!employeeId || !password) {
       return res.status(400).json({ error: "employeeId and password are required" });
     }
@@ -38,6 +38,11 @@ router.post("/login", async (req, res) => {
 
     const match = await bcrypt.compare(password, user.passwordHash);
     if (!match) return res.status(401).json({ error: "Invalid credentials" });
+
+    if (deviceName || deviceId) {
+      user.lastDevice = { deviceName, deviceId, timestamp: new Date() };
+      await user.save();
+    }
 
     const token = signToken(user);
     res.json({
@@ -85,7 +90,7 @@ router.post("/users", requireAuth, requireManager, async (req, res) => {
 
 router.put("/users/:employeeId", requireAuth, requireManager, async (req, res) => {
   try {
-    const { name, phone, password, officeStartTime, officeEndTime, active, ratePerKm } = req.body;
+    const { name, phone, password, officeStartTime, officeEndTime, active, ratePerKm, startPoint, endPoint } = req.body;
     const update = {};
     if (name) update.name = name;
     if (phone) update.phone = phone;
@@ -94,9 +99,15 @@ router.put("/users/:employeeId", requireAuth, requireManager, async (req, res) =
     if (typeof active === "boolean") update.active = active;
     if (typeof ratePerKm === "number") update.ratePerKm = ratePerKm;
     if (password) update.passwordHash = await bcrypt.hash(password, 10);
+    if (startPoint && typeof startPoint.latitude === "number" && typeof startPoint.longitude === "number") {
+      update.startPoint = { latitude: startPoint.latitude, longitude: startPoint.longitude };
+    }
+    if (endPoint && typeof endPoint.latitude === "number" && typeof endPoint.longitude === "number") {
+      update.endPoint = { latitude: endPoint.latitude, longitude: endPoint.longitude };
+    }
 
     const user = await User.findOneAndUpdate(
-      { employeeId: req.params.employeeId }, update, { new: true }
+      { employeeId: req.params.employeeId }, { $set: update }, { new: true }
     ).select("-passwordHash");
 
     if (!user) return res.status(404).json({ error: "User not found" });
@@ -113,7 +124,7 @@ router.put("/users/:employeeId/toggle-active", requireAuth, requireManager, asyn
     if (typeof active !== "boolean") return res.status(400).json({ error: "active (boolean) is required" });
 
     const user = await User.findOneAndUpdate(
-      { employeeId: req.params.employeeId }, { active }, { new: true }
+      { employeeId: req.params.employeeId }, { $set: { active } }, { new: true }
     ).select("-passwordHash");
 
     if (!user) return res.status(404).json({ error: "User not found" });
@@ -126,15 +137,25 @@ router.put("/users/:employeeId/toggle-active", requireAuth, requireManager, asyn
 // Set/update the auto-tracking schedule for one employee
 router.put("/users/:employeeId/schedule", requireAuth, requireManager, async (req, res) => {
   try {
-    const { enabled, days, startTime, endTime } = req.body;
-    const autoSchedule = {};
-    if (typeof enabled === "boolean") autoSchedule.enabled = enabled;
-    if (Array.isArray(days)) autoSchedule.days = days;
-    if (startTime) autoSchedule.startTime = startTime;
-    if (endTime) autoSchedule.endTime = endTime;
+    const { enabled, days, startTime, endTime, intervalMinutes } = req.body;
+
+    const existing = await User.findOne({ employeeId: req.params.employeeId });
+    if (!existing) return res.status(404).json({ error: "User not found" });
+
+    // Merge onto the existing schedule rather than replacing it outright,
+    // so a save that only sends some fields doesn't blank out the others.
+    const merged = {
+      enabled: typeof enabled === "boolean" ? enabled : existing.autoSchedule?.enabled ?? false,
+      days: Array.isArray(days) ? days : existing.autoSchedule?.days ?? [],
+      startTime: startTime || existing.autoSchedule?.startTime || "08:00",
+      endTime: endTime || existing.autoSchedule?.endTime || "20:00",
+      intervalMinutes: typeof intervalMinutes === "number" && intervalMinutes > 0
+        ? intervalMinutes
+        : existing.autoSchedule?.intervalMinutes ?? 30,
+    };
 
     const user = await User.findOneAndUpdate(
-      { employeeId: req.params.employeeId }, { autoSchedule }, { new: true }
+      { employeeId: req.params.employeeId }, { $set: { autoSchedule: merged } }, { new: true }
     ).select("-passwordHash");
 
     if (!user) return res.status(404).json({ error: "User not found" });
@@ -147,7 +168,7 @@ router.put("/users/:employeeId/schedule", requireAuth, requireManager, async (re
 router.delete("/users/:employeeId", requireAuth, requireManager, async (req, res) => {
   try {
     const user = await User.findOneAndUpdate(
-      { employeeId: req.params.employeeId }, { active: false }, { new: true }
+      { employeeId: req.params.employeeId }, { $set: { active: false } }, { new: true }
     );
     if (!user) return res.status(404).json({ error: "User not found" });
     res.json({ message: "User deactivated", employeeId: user.employeeId });

@@ -38,10 +38,10 @@ router.post("/", requireAuth, async (req, res) => {
 
     await User.updateOne(
       { employeeId },
-      {
+      { $set: {
         lastLocation: { latitude, longitude, timestamp: ts, placeName },
         lastDevice: { deviceName, deviceId, timestamp: ts },
-      }
+      } }
     );
 
     res.status(201).json({ message: "Punch recorded", punch });
