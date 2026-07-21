@@ -993,21 +993,32 @@
     const isFirstAnchor = first.kind === "start_point";
     const isLastAnchor = last.kind === "end_point";
 
-    const realStartIdx = isFirstAnchor ? 1 : 0;
-    const realEndIdx = isLastAnchor ? latlngs.length - 2 : latlngs.length - 1;
-    const realRoute = latlngs.slice(realStartIdx, realEndIdx + 1);
+    // Try snapping the entire route (including any fixed anchors). If that
+    // succeeds we'll draw the snapped road-following polyline. Otherwise
+    // fall back to snapping only the inner activity points and drawing
+    // short assumed legs between anchors and first/last activity.
+    const snappedFull = await snapRouteToRoads(latlngs);
+    let drawnBounds = latlngs;
+    if (snappedFull && snappedFull.length) {
+      L.polyline(snappedFull, { color: "#3b82f6", weight: 6, dashArray: "6,6" }).addTo(routeLayerGroup);
+      drawnBounds = snappedFull;
+    } else {
+      const realStartIdx = isFirstAnchor ? 1 : 0;
+      const realEndIdx = isLastAnchor ? latlngs.length - 2 : latlngs.length - 1;
+      const realRoute = latlngs.slice(realStartIdx, realEndIdx + 1);
 
-    if (isFirstAnchor && realRoute.length) {
-      L.polyline([latlngs[0], realRoute[0]], { color: "#facc15", weight: 4, dashArray: "8,8" })
-        .addTo(routeLayerGroup).bindPopup("Assumed leg: Start Point → first activity");
-    }
-    if (realRoute.length > 1) {
-      const snapped = await snapRouteToRoads(realRoute);
-      L.polyline(snapped || realRoute, { color: "#4ea1f7", weight: 4 }).addTo(routeLayerGroup);
-    }
-    if (isLastAnchor && realRoute.length) {
-      L.polyline([realRoute[realRoute.length - 1], latlngs[latlngs.length - 1]], { color: "#facc15", weight: 4, dashArray: "8,8" })
-        .addTo(routeLayerGroup).bindPopup("Assumed leg: last activity → End Point");
+      if (isFirstAnchor && realRoute.length) {
+        L.polyline([latlngs[0], realRoute[0]], { color: "#3b82f6", weight: 4, dashArray: "8,8" })
+          .addTo(routeLayerGroup).bindPopup("Assumed leg: Start Point → first activity");
+      }
+      if (realRoute.length > 1) {
+        const snapped = await snapRouteToRoads(realRoute);
+        L.polyline(snapped || realRoute, { color: "#3b82f6", weight: 6, dashArray: "6,6" }).addTo(routeLayerGroup);
+      }
+      if (isLastAnchor && realRoute.length) {
+        L.polyline([realRoute[realRoute.length - 1], latlngs[latlngs.length - 1]], { color: "#3b82f6", weight: 4, dashArray: "8,8" })
+          .addTo(routeLayerGroup).bindPopup("Assumed leg: last activity → End Point");
+      }
     }
 
     const startIcon = L.divIcon({
@@ -1022,19 +1033,19 @@
     L.marker(latlngs[0], { icon: startIcon }).addTo(routeLayerGroup).bindPopup(startLabel);
 
     if (latlngs.length > 1) {
-      const endIcon = L.divIcon({
-        html: isLastAnchor
-          ? '<div style="background:#f59e0b;width:20px;height:20px;border-radius:50%;border:3px solid white;display:flex;align-items:center;justify-content:center;font-size:11px;">🏠</div>'
-          : '<div style="background:#f5455c;width:16px;height:16px;border-radius:50%;border:3px solid white;"></div>',
-        className: "", iconSize: isLastAnchor ? [20, 20] : [16, 16],
-      });
+      const endIcon = isLastAnchor
+        ? L.divIcon({
+            html: '<div style="background:#f59e0b;width:20px;height:20px;border-radius:50%;border:3px solid white;display:flex;align-items:center;justify-content:center;font-size:11px;">🏠</div>',
+            className: '', iconSize: [20,20],
+          })
+        : L.divIcon({ html: '<div class="pulse-dot"></div>', className: '', iconSize: [16,16] });
       const endLabel = isLastAnchor
         ? `<b>🏠 Base (End Point)</b><br>Fixed anchor set by manager<br>${last.latitude.toFixed(5)}, ${last.longitude.toFixed(5)}`
         : `<b>Last point</b><br>${new Date(last.timestamp).toLocaleTimeString()}<br>${last.latitude.toFixed(5)}, ${last.longitude.toFixed(5)}`;
       L.marker(latlngs[latlngs.length - 1], { icon: endIcon }).addTo(routeLayerGroup).bindPopup(endLabel);
     }
 
-    setTimeout(() => { map.invalidateSize(); map.fitBounds(latlngs, { padding: [40, 40] }); }, 150);
+    setTimeout(() => { map.invalidateSize(); map.fitBounds(drawnBounds, { padding: [40, 40] }); }, 150);
   }
 
   function closeModal() {
