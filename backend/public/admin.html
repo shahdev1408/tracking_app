@@ -2,410 +2,651 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>Admin Dashboard - Tracking App</title>
+<title>Dispatch — Employee Tracking</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
+  :root {
+    --ink: #14171c;
+    --panel: #1a1e26;
+    --panel-2: #21262f;
+    --panel-3: #2a303b;
+    --border: #313846;
+    --border-soft: #262b35;
+    --text: #eef0f4;
+    --text-dim: #939bad;
+    --text-faint: #5c6478;
+    --signal: #ff7a1a;
+    --signal-soft: #3a2716;
+    --signal-glow: rgba(255, 122, 26, 0.35);
+    --live: #34d399;
+    --live-soft: #10261f;
+    --danger: #f5455c;
+    --danger-soft: #2c1219;
+    --info: #4ea1f7;
+    --info-soft: #142334;
+    --purple: #a78bfa;
+    --font-display: 'Space Grotesk', sans-serif;
+    --font-body: 'Inter', -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --radius-sm: 8px;
+    --radius: 12px;
+    --radius-lg: 18px;
+  }
+
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
-    font-family: -apple-system, Segoe UI, Roboto, sans-serif;
-    margin: 0; background: #0f172a; color: #f1f5f9;
-    height: 100%; overflow: hidden;
+    margin: 0; height: 100%; background: var(--ink); color: var(--text);
+    font-family: var(--font-body); overflow: hidden;
+    -webkit-font-smoothing: antialiased;
   }
+  ::selection { background: var(--signal-glow); color: var(--text); }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--panel-3); border-radius: 8px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--border); }
+  a { color: inherit; }
+  button { font-family: inherit; }
+  :focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
   .hidden { display: none !important; }
 
-  /* ---------- Login screen ---------- */
+  /* ================= LOGIN ================= */
   #loginScreen {
-    display: flex; align-items: center; justify-content: center;
-    height: 100vh; padding: 16px;
+    height: 100vh; display: flex; align-items: center; justify-content: center;
+    padding: 24px; position: relative; overflow: hidden;
+    background:
+      radial-gradient(circle at 20% 20%, rgba(255,122,26,0.08), transparent 40%),
+      radial-gradient(circle at 80% 80%, rgba(78,161,247,0.07), transparent 40%),
+      var(--ink);
   }
+  #loginScreen::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0.5;
+    background-image:
+      linear-gradient(var(--border-soft) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border-soft) 1px, transparent 1px);
+    background-size: 44px 44px;
+    mask-image: radial-gradient(circle at 50% 40%, black 0%, transparent 70%);
+  }
+  .login-wrap { position: relative; z-index: 1; width: 100%; max-width: 380px; }
+  .login-brand { display: flex; align-items: center; gap: 10px; justify-content: center; margin-bottom: 28px; }
+  .radar-dot { position: relative; width: 12px; height: 12px; border-radius: 50%; background: var(--signal); flex-shrink: 0; }
+  .radar-dot::after {
+    content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 1.5px solid var(--signal);
+    animation: radarPing 2.2s cubic-bezier(0.2, 0.8, 0.3, 1) infinite;
+  }
+  @keyframes radarPing {
+    0% { transform: scale(0.6); opacity: 0.9; }
+    100% { transform: scale(2.6); opacity: 0; }
+  }
+  .login-brand span { font-family: var(--font-display); font-weight: 600; font-size: 15px; letter-spacing: 0.3px; color: var(--text-dim); text-transform: uppercase; }
   .login-box {
-    background: #1e293b; padding: 32px; border-radius: 12px;
-    width: 100%; max-width: 340px;
+    background: var(--panel); border: 1px solid var(--border-soft); border-radius: var(--radius-lg);
+    padding: 32px 28px; box-shadow: 0 30px 60px -20px rgba(0,0,0,0.6);
   }
-  .login-box h2 { margin-top: 0; text-align: center; }
-  .login-box input {
-    width: 100%; padding: 14px; margin: 8px 0; border-radius: 8px;
-    border: none; background: #0b1220; color: #f1f5f9; font-size: 16px;
+  .login-box h1 { font-family: var(--font-display); font-size: 22px; font-weight: 600; margin: 0 0 4px; }
+  .login-box p.sub { color: var(--text-dim); font-size: 13.5px; margin: 0 0 24px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 6px; font-weight: 500; }
+  .field input {
+    width: 100%; padding: 13px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border);
+    background: var(--panel-2); color: var(--text); font-size: 14.5px; font-family: var(--font-body);
+    transition: border-color 0.15s, background 0.15s;
   }
-  .login-box button {
-    width: 100%; padding: 14px; margin-top: 12px; border: none; border-radius: 8px;
-    background: #22c55e; color: white; font-weight: bold; font-size: 15px; cursor: pointer;
+  .field input:focus { border-color: var(--signal); background: var(--panel-3); }
+  .field input::placeholder { color: var(--text-faint); }
+  .btn-primary {
+    width: 100%; padding: 13px; border: none; border-radius: var(--radius-sm); margin-top: 6px;
+    background: var(--signal); color: #1a0f04; font-weight: 700; font-size: 14.5px; cursor: pointer;
+    transition: filter 0.15s, transform 0.1s;
   }
-  .login-box button:hover { background: #16a34a; }
-  .error-msg { color: #f87171; font-size: 13px; margin-top: 8px; text-align: center; }
+  .btn-primary:hover { filter: brightness(1.08); }
+  .btn-primary:active { transform: scale(0.98); }
+  .login-error { color: var(--danger); font-size: 13px; margin-top: 12px; text-align: center; min-height: 16px; }
 
-  /* ---------- Dashboard shell ---------- */
+  /* ================= APP SHELL ================= */
   #dashboard { display: none; height: 100vh; flex-direction: column; }
-  header {
-    padding: 12px 16px; background: #1e293b; display: flex;
-    justify-content: space-between; align-items: center; flex-shrink: 0;
-  }
-  header h1 { font-size: 16px; margin: 0; }
-  header .header-actions { display: flex; gap: 8px; align-items: center; }
-  header button {
-    background: #334155; color: #f1f5f9; border: none; padding: 10px 14px;
-    border-radius: 8px; cursor: pointer; font-size: 13px;
-  }
 
-  .layout { display: flex; flex: 1; min-height: 0; }
-  #employeePanel {
-    width: 340px; background: #1e293b; padding: 16px; overflow-y: auto;
+  header.topbar {
+    height: 60px; flex-shrink: 0; display: flex; align-items: center; gap: 16px;
+    padding: 0 18px; background: var(--panel); border-bottom: 1px solid var(--border-soft);
+    z-index: 20;
+  }
+  .brand { display: flex; align-items: center; gap: 9px; flex-shrink: 0; }
+  .brand span.word { font-family: var(--font-display); font-weight: 600; font-size: 15.5px; letter-spacing: 0.2px; }
+  .brand span.word em { color: var(--signal); font-style: normal; }
+
+  .topbar-search { flex: 1; max-width: 340px; position: relative; }
+  .topbar-search input {
+    width: 100%; padding: 9px 12px 9px 34px; border-radius: 999px; border: 1px solid var(--border);
+    background: var(--panel-2); color: var(--text); font-size: 13.5px;
+  }
+  .topbar-search input:focus { border-color: var(--signal); }
+  .topbar-search svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--text-faint); pointer-events: none; }
+
+  .topbar-spacer { flex: 1; }
+  .emp-count-badge {
+    font-family: var(--font-mono); font-size: 12px; color: var(--text-dim);
+    background: var(--panel-2); border: 1px solid var(--border-soft); padding: 5px 10px; border-radius: 999px;
     flex-shrink: 0;
   }
-  #employeePanel h3 { margin-top: 0; }
-  #map { flex: 1; min-width: 0; }
-
-  /* Mobile view-switch button - hidden on larger screens */
+  .icon-btn {
+    background: var(--panel-2); border: 1px solid var(--border-soft); color: var(--text);
+    padding: 9px 14px; border-radius: var(--radius-sm); cursor: pointer; font-size: 13px; font-weight: 500;
+    display: inline-flex; align-items: center; gap: 6px; transition: background 0.15s, border-color 0.15s;
+    flex-shrink: 0;
+  }
+  .icon-btn:hover { background: var(--panel-3); border-color: var(--border); }
   .view-switch-btn { display: none; }
 
-  .emp-row {
-    background: #0b1220; padding: 12px; border-radius: 8px; margin-bottom: 8px;
-    display: flex; justify-content: space-between; align-items: center; font-size: 13px;
-    cursor: pointer;
-  }
-  .emp-row:hover { background: #16233a; }
-  .emp-row .name { font-weight: bold; }
-  .emp-row .sub { color: #94a3b8; font-size: 11px; margin-top: 2px; }
+  .layout { display: flex; flex: 1; min-height: 0; }
 
-  .add-form { margin-top: 16px; border-top: 1px solid #334155; padding-top: 16px; }
-  .add-form input, .add-form select {
-    width: 100%; padding: 12px; margin: 4px 0; border-radius: 6px; border: none;
-    background: #0b1220; color: #f1f5f9; font-size: 15px;
+  /* ---- Sidebar / roster ---- */
+  #employeePanel {
+    width: 356px; flex-shrink: 0; background: var(--panel); border-right: 1px solid var(--border-soft);
+    display: flex; flex-direction: column; min-height: 0;
   }
-  .add-form button {
-    width: 100%; padding: 12px; margin-top: 8px; border: none; border-radius: 6px;
-    background: #22c55e; color: white; font-weight: bold; cursor: pointer; font-size: 14px;
+  .roster-header {
+    padding: 16px 16px 10px; display: flex; align-items: center; justify-content: space-between;
+  }
+  .roster-header h2 { font-family: var(--font-display); font-size: 13px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-dim); margin: 0; font-weight: 600; }
+  #employeeList { flex: 1; overflow-y: auto; padding: 4px 12px 12px; }
+
+  .emp-card {
+    background: var(--panel-2); border: 1px solid var(--border-soft); border-radius: var(--radius);
+    padding: 13px 14px; margin-bottom: 8px; cursor: pointer; transition: border-color 0.15s, background 0.15s;
+  }
+  .emp-card:hover { border-color: var(--border); background: var(--panel-3); }
+  .emp-card-top { display: flex; align-items: center; gap: 10px; }
+  .avatar {
+    width: 36px; height: 36px; border-radius: 10px; background: var(--panel-3); flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-family: var(--font-display);
+    font-weight: 600; font-size: 13.5px; color: var(--text-dim); position: relative;
+  }
+  .avatar .status-dot {
+    position: absolute; bottom: -2px; right: -2px; width: 11px; height: 11px; border-radius: 50%;
+    border: 2px solid var(--panel-2); background: var(--text-faint);
+  }
+  .avatar .status-dot.on { background: var(--live); }
+  .avatar .status-dot.on::after {
+    content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--live);
+    animation: dotPulse 1.8s ease-out infinite;
+  }
+  @keyframes dotPulse { 0% { opacity: 0.7; transform: scale(1); } 100% { opacity: 0; transform: scale(2.2); } }
+
+  .emp-card-name { font-weight: 600; font-size: 14px; line-height: 1.3; }
+  .emp-card-id { font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); margin-top: 1px; }
+  .emp-card-meta { margin-top: 9px; font-size: 11.5px; color: var(--text-dim); display: flex; flex-direction: column; gap: 2px; }
+  .emp-card-meta .dim { color: var(--text-faint); }
+
+  .emp-card-actions { display: flex; gap: 6px; margin-top: 11px; flex-wrap: wrap; align-items: center; }
+  .chip-toggle { position: relative; width: 34px; height: 19px; flex-shrink: 0; }
+  .chip-toggle input { display: none; }
+  .chip-slider { position: absolute; inset: 0; background: var(--panel-3); border: 1px solid var(--border); border-radius: 20px; transition: 0.15s; cursor: pointer; }
+  .chip-slider::before { content: ""; position: absolute; width: 13px; height: 13px; left: 2px; top: 2px; background: var(--text-dim); border-radius: 50%; transition: 0.15s; }
+  .chip-toggle input:checked + .chip-slider { background: var(--live-soft); border-color: var(--live); }
+  .chip-toggle input:checked + .chip-slider::before { transform: translateX(15px); background: var(--live); }
+
+  .mini-btn {
+    font-size: 11px; padding: 6px 9px; border-radius: 7px; border: 1px solid var(--border-soft);
+    background: transparent; color: var(--text-dim); cursor: pointer; font-weight: 500; transition: 0.15s;
+  }
+  .mini-btn:hover { background: var(--panel-3); color: var(--text); }
+  .mini-btn.live-on { background: var(--signal-soft); border-color: var(--signal); color: var(--signal); }
+  .mini-btn.danger:hover { background: var(--danger-soft); border-color: var(--danger); color: var(--danger); }
+
+  .empty-state { text-align: center; padding: 40px 16px; color: var(--text-faint); font-size: 13px; }
+
+  /* ---- Add employee accordion ---- */
+  .add-employee-toggle {
+    margin: 4px 16px 14px; padding: 11px 14px; border-radius: var(--radius-sm); border: 1px dashed var(--border);
+    background: transparent; color: var(--text-dim); font-size: 13px; font-weight: 500; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 6px; transition: 0.15s; flex-shrink: 0;
+  }
+  .add-employee-toggle:hover { border-color: var(--signal); color: var(--signal); }
+  #addForm { padding: 0 16px 16px; flex-shrink: 0; }
+  #addForm input, #addForm select {
+    width: 100%; padding: 10px 12px; margin-bottom: 8px; border-radius: var(--radius-sm); border: 1px solid var(--border);
+    background: var(--panel-2); color: var(--text); font-size: 13.5px;
+  }
+  #addForm input:focus, #addForm select:focus { border-color: var(--signal); }
+  #addForm button { width: 100%; padding: 11px; border: none; border-radius: var(--radius-sm); background: var(--signal); color: #1a0f04; font-weight: 700; font-size: 13.5px; cursor: pointer; }
+
+  /* ---- Map ---- */
+  #map { flex: 1; min-width: 0; background: #0d1014; }
+  .leaflet-control-zoom a { width: 34px !important; height: 34px !important; line-height: 34px !important; }
+  .leaflet-popup-content-wrapper { background: var(--panel-2); color: var(--text); border-radius: 10px; font-family: var(--font-body); }
+  .leaflet-popup-tip { background: var(--panel-2); }
+  .leaflet-popup-content { font-size: 12.5px; line-height: 1.5; }
+  .leaflet-popup-content b { font-family: var(--font-display); }
+
+  /* ================= DETAIL DRAWER ================= */
+  .drawer-overlay {
+    position: fixed; inset: 0; background: rgba(8,10,13,0.7); backdrop-filter: blur(2px);
+    z-index: 999; display: flex; justify-content: flex-end;
+  }
+  .drawer {
+    width: 480px; max-width: 100%; height: 100%; background: var(--panel);
+    border-left: 1px solid var(--border-soft); display: flex; flex-direction: column;
+    animation: slideIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @keyframes slideIn { from { transform: translateX(24px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+  .drawer-head { padding: 20px 20px 0; flex-shrink: 0; }
+  .drawer-head-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .drawer-title { font-family: var(--font-display); font-size: 19px; font-weight: 600; }
+  .drawer-sub { font-family: var(--font-mono); font-size: 12px; color: var(--text-faint); margin-top: 2px; }
+  .drawer-close {
+    background: var(--panel-2); border: 1px solid var(--border-soft); color: var(--text-dim);
+    width: 32px; height: 32px; border-radius: 9px; cursor: pointer; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 16px;
+  }
+  .drawer-close:hover { color: var(--text); border-color: var(--border); }
+
+  .tabs { display: flex; gap: 4px; margin-top: 18px; border-bottom: 1px solid var(--border-soft); }
+  .tab-btn {
+    background: none; border: none; color: var(--text-dim); padding: 9px 4px; margin-right: 18px;
+    font-size: 13px; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px;
+    transition: color 0.15s;
+  }
+  .tab-btn.active { color: var(--signal); border-bottom-color: var(--signal); }
+  .tab-btn:hover:not(.active) { color: var(--text); }
+
+  .drawer-body { flex: 1; overflow-y: auto; padding: 18px 20px 28px; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
+  .stat-card { background: var(--panel-2); border: 1px solid var(--border-soft); border-radius: var(--radius); padding: 13px 14px; }
+  .stat-card .label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-faint); font-weight: 600; }
+  .stat-card .value { font-family: var(--font-mono); font-size: 19px; font-weight: 600; margin-top: 5px; }
+  .stat-card.accent .value { color: var(--signal); }
+  .stat-card.wide { grid-column: span 2; }
+
+  .btn-secondary {
+    width: 100%; padding: 11px; border-radius: var(--radius-sm); border: 1px solid var(--border);
+    background: var(--panel-2); color: var(--text); font-weight: 600; font-size: 13.5px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 7px; transition: 0.15s;
+  }
+  .btn-secondary:hover { border-color: var(--signal); color: var(--signal); }
+
+  h4.block-label {
+    font-family: var(--font-display); font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px;
+    color: var(--text-faint); font-weight: 600; margin: 22px 0 10px;
   }
 
-  .emp-actions { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
-  .emp-actions button {
-    font-size: 11px; padding: 8px 10px; border: none; border-radius: 6px; cursor: pointer;
+  /* Daily log */
+  .day-block { background: var(--panel-2); border: 1px solid var(--border-soft); border-radius: var(--radius); padding: 14px; margin-bottom: 10px; }
+  .day-block-head { display: flex; align-items: baseline; justify-content: space-between; }
+  .day-date { font-family: var(--font-display); font-weight: 600; font-size: 14.5px; }
+  .day-pay { font-family: var(--font-mono); font-size: 14.5px; color: var(--signal); font-weight: 600; }
+  .day-line { font-size: 12px; color: var(--text-dim); margin-top: 5px; font-family: var(--font-mono); }
+  .day-block .btn-route {
+    margin-top: 11px; width: 100%; padding: 9px; border-radius: 8px; border: 1px solid var(--info);
+    background: var(--info-soft); color: var(--info); font-weight: 600; font-size: 12.5px; cursor: pointer;
   }
-  .btn-edit { background: #334155; color: #f1f5f9; }
-  .btn-remove { background: #ef4444; color: white; }
-  .btn-live { background: #f59e0b; color: white; }
-  .btn-live.active { background: #ef4444; }
-
-  /* ---------- Enable/Disable toggle switch ---------- */
-  .toggle-switch { position: relative; width: 40px; height: 22px; display: inline-block; flex-shrink: 0; cursor: pointer; }
-  .toggle-switch input { display: none; }
-  .toggle-slider {
-    position: absolute; inset: 0; background: #64748b; border-radius: 22px; transition: 0.2s;
-  }
-  .toggle-slider::before {
-    content: ""; position: absolute; width: 18px; height: 18px; left: 2px; top: 2px;
-    background: white; border-radius: 50%; transition: 0.2s;
-  }
-  .toggle-switch input:checked + .toggle-slider { background: #22c55e; }
-  .toggle-switch input:checked + .toggle-slider::before { transform: translateX(18px); }
-
-  .status-pill { padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: bold; }
-  .status-pill.on { background: #14532d; color: #4ade80; }
-  .status-pill.off { background: #450a0a; color: #f87171; }
-
-  /* ---------- Modal ---------- */
-  .modal-overlay {
-    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center;
-    z-index: 9999; padding: 12px;
-  }
-  .modal-box {
-    background: #1e293b; padding: 20px; border-radius: 12px; width: 100%; max-width: 620px;
-    max-height: 90vh; overflow-y: auto;
-  }
-  .modal-box h2 { margin-top: 0; font-size: 18px; word-break: break-word; }
-  .modal-box input, .modal-box select {
-    width: 100%; padding: 12px; margin: 6px 0; border-radius: 8px;
-    border: none; background: #0b1220; color: #f1f5f9; font-size: 15px;
-  }
-  .modal-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
-  .modal-actions button {
-    flex: 1; min-width: 120px; padding: 12px; border: none; border-radius: 8px;
-    cursor: pointer; font-weight: bold; font-size: 14px;
-  }
-  .btn-save { background: #22c55e; color: white; }
-  .btn-cancel { background: #334155; color: #f1f5f9; }
-  .btn-danger { background: #ef4444; color: white; }
-  .btn-download {
-    background: #22c55e; color: white; border: none; padding: 8px 14px;
-    border-radius: 6px; cursor: pointer; font-size: 13px; margin-top: 6px;
-  }
-
-  .detail-stats-row { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: #94a3b8; margin-bottom: 12px; }
-
-  /* ---------- Enable/Disable + anchor points + schedule section in modal ---------- */
-  .settings-block { background: #0b1220; padding: 14px; border-radius: 8px; margin: 10px 0; }
-  .settings-block h4 { margin: 0 0 8px 0; font-size: 12px; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px; }
-  .settings-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-  .settings-row label { font-size: 13px; color: #cbd5e1; min-width: 90px; }
-  .coord-input {
-    flex: 1; padding: 10px; border-radius: 6px; border: none;
-    background: #1e293b; color: #f1f5f9; font-size: 13px; min-width: 0;
-  }
-  .day-chip {
-    display: inline-flex; align-items: center; gap: 4px; margin-right: 10px; margin-bottom: 6px;
-    font-size: 12px; color: #cbd5e1;
-  }
-  .day-chip input { accent-color: #22c55e; width: 16px; height: 16px; }
-  .time-row { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
-  .time-row input[type=time] {
-    padding: 8px; border-radius: 6px; border: none; background: #1e293b; color: #f1f5f9; font-size: 13px;
-  }
-
-  /* ---------- Daily summary rows ---------- */
-  .day-row {
-    background: #0b1220; padding: 12px; border-radius: 8px; margin-bottom: 10px; font-size: 13px;
-  }
-  .day-row .date { font-weight: bold; color: #22c55e; font-size: 14px; }
-  .day-row .stat { color: #94a3b8; margin-top: 4px; }
-  .day-row .btn-route {
-    margin-top: 8px; background: #3b82f6; color: white; border: none;
-    padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; width: 100%;
-  }
+  .day-block .btn-route:hover { filter: brightness(1.15); }
 
   .section-toggle {
-    margin-top: 10px; padding: 8px 10px; background: #16233a; border-radius: 6px;
-    cursor: pointer; font-size: 12px; font-weight: bold; color: #f1f5f9;
+    margin-top: 10px; padding: 8px 10px; background: var(--panel-3); border-radius: 7px;
+    cursor: pointer; font-size: 11.5px; font-weight: 600; color: var(--text-dim);
   }
-  .section-toggle:hover { background: #1c2b45; }
-  .section-body { margin-top: 6px; max-height: 260px; overflow-y: auto; }
+  .section-toggle:hover { color: var(--text); }
+  .section-body { margin-top: 6px; max-height: 280px; overflow-y: auto; }
+
   .point-row {
-    background: #0b1220; padding: 10px; border-radius: 6px; margin-bottom: 6px;
-    font-size: 11px; color: #cbd5e1; border-left: 3px solid #3b82f6;
+    background: var(--panel); border: 1px solid var(--border-soft); border-left: 3px solid var(--info);
+    padding: 10px 11px; border-radius: 7px; margin-bottom: 6px; font-size: 11.5px; color: var(--text-dim);
   }
-  .point-row .mono { font-family: monospace; color: #94a3b8; word-break: break-all; }
-  .point-row .place { color: #60a5fa; font-style: italic; }
-
+  .point-row .mono { font-family: var(--font-mono); color: var(--text-faint); word-break: break-all; font-size: 11px; }
+  .point-row .place { color: var(--info); font-style: italic; }
+  .point-row-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
   .btn-delete-point {
-    background: #7f1d1d; color: #fca5a5; border: none; border-radius: 4px;
-    width: 26px; height: 26px; cursor: pointer; font-size: 13px; flex-shrink: 0;
+    background: var(--danger-soft); color: var(--danger); border: 1px solid transparent; border-radius: 6px;
+    width: 24px; height: 24px; cursor: pointer; font-size: 12px; flex-shrink: 0;
   }
-  .btn-delete-point:hover { background: #ef4444; color: white; }
+  .btn-delete-point:hover { border-color: var(--danger); }
+  .punch-photo { width: 46px; height: 46px; object-fit: cover; border-radius: 7px; cursor: pointer; margin-top: 7px; display: block; }
+  .cat-tag { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; margin-top: 5px; letter-spacing: 0.2px; }
+  .cat-tag.project { background: var(--info-soft); color: var(--info); }
+  .cat-tag.personal { background: #2e2210; color: #f0c14b; }
+  .device-tag { color: var(--text-faint); font-size: 10.5px; display: block; margin-top: 4px; font-family: var(--font-mono); }
 
-  .punch-photo {
-    width: 48px; height: 48px; object-fit: cover; border-radius: 6px; cursor: pointer;
-    background: #1e293b; margin-top: 6px; display: block;
+  /* Settings tab */
+  .field-row { display: flex; gap: 8px; }
+  .field-row .field { flex: 1; }
+  .settings-block { background: var(--panel-2); border: 1px solid var(--border-soft); border-radius: var(--radius); padding: 15px; margin-bottom: 14px; }
+  .settings-block h4 { margin: 0 0 12px; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-faint); font-weight: 600; }
+  .settings-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .settings-row label { font-size: 12.5px; color: var(--text-dim); min-width: 80px; }
+  .coord-input {
+    flex: 1; padding: 9px 10px; border-radius: 7px; border: 1px solid var(--border);
+    background: var(--panel); color: var(--text); font-size: 12.5px; font-family: var(--font-mono); min-width: 0;
   }
-  .cat-tag { display: inline-block; padding: 2px 7px; border-radius: 6px; font-size: 10px; font-weight: bold; margin-right: 6px; }
-  .cat-tag.project { background: #1e3a8a; color: #93c5fd; }
-  .cat-tag.personal { background: #713f12; color: #fcd34d; }
-  .device-tag { color: #64748b; font-size: 10px; display: block; margin-top: 3px; }
+  .coord-input:focus { border-color: var(--signal); }
+  .day-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .day-chip {
+    padding: 6px 11px; border-radius: 999px; border: 1px solid var(--border); background: var(--panel);
+    font-size: 11.5px; color: var(--text-dim); cursor: pointer; user-select: none; transition: 0.15s;
+  }
+  .day-chip input { display: none; }
+  .day-chip.checked { background: var(--signal-soft); border-color: var(--signal); color: var(--signal); font-weight: 600; }
+  .time-row { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
+  .time-row input[type=time] { padding: 8px; border-radius: 7px; border: 1px solid var(--border); background: var(--panel); color: var(--text); font-size: 12.5px; font-family: var(--font-mono); flex: 1; }
 
-  .pulse-dot {
-    width: 16px; height: 16px; border-radius: 50%; background: #3b82f6;
-    border: 3px solid white; box-shadow: 0 0 0 rgba(59,130,246,0.6);
-    animation: pulse 1.5s infinite;
-  }
-  @keyframes pulse {
-    0% { box-shadow: 0 0 0 0 rgba(59,130,246,0.6); }
-    70% { box-shadow: 0 0 0 12px rgba(59,130,246,0); }
-    100% { box-shadow: 0 0 0 0 rgba(59,130,246,0); }
-  }
+  .save-bar { display: flex; gap: 8px; margin-top: 6px; }
+  .btn-save { flex: 1; padding: 12px; border: none; border-radius: var(--radius-sm); background: var(--signal); color: #1a0f04; font-weight: 700; font-size: 13.5px; cursor: pointer; }
+  .btn-save:hover { filter: brightness(1.08); }
+  .danger-zone { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border-soft); }
+  .btn-danger-full { width: 100%; padding: 11px; border-radius: var(--radius-sm); border: 1px solid var(--danger); background: var(--danger-soft); color: var(--danger); font-weight: 600; font-size: 13px; cursor: pointer; }
+  .btn-danger-full:hover { background: var(--danger); color: white; }
 
-  /* ---------- Photo zoom modal ---------- */
+  /* ================= PHOTO MODAL ================= */
   #photoModal {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: flex;
-    align-items: center; justify-content: center; z-index: 10000; padding: 20px;
+    position: fixed; inset: 0; background: rgba(6,8,10,0.92); display: flex;
+    align-items: center; justify-content: center; z-index: 1100; padding: 24px;
   }
-  #photoModal img { max-width: 92vw; max-height: 92vh; border-radius: 10px; }
-  #photoModal .close-x { position: absolute; top: 18px; right: 24px; color: white; font-size: 32px; cursor: pointer; }
+  #photoModal img { max-width: 92vw; max-height: 92vh; border-radius: 12px; box-shadow: 0 30px 70px rgba(0,0,0,0.6); }
+  #photoModal .close-x { position: absolute; top: 20px; right: 26px; color: white; font-size: 30px; cursor: pointer; opacity: 0.8; }
+  #photoModal .close-x:hover { opacity: 1; }
 
-  /* Leaflet control sizing - bigger touch targets on all devices */
-  .leaflet-control-zoom a { width: 36px !important; height: 36px !important; line-height: 36px !important; font-size: 18px !important; }
+  /* ================= TOASTS ================= */
+  #toastContainer { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); z-index: 1200; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+  .toast {
+    background: var(--panel-3); border: 1px solid var(--border); color: var(--text);
+    padding: 11px 18px; border-radius: 999px; font-size: 13px; font-weight: 500;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4); animation: toastIn 0.2s ease-out;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .toast.success { border-color: var(--live); }
+  .toast.success::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--live); flex-shrink: 0; }
+  .toast.error { border-color: var(--danger); }
+  .toast.error::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--danger); flex-shrink: 0; }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
-  /* ============ TABLET ============ */
+  /* ================= RESPONSIVE ================= */
+  /* Tablet */
   @media (max-width: 1024px) {
-    #employeePanel { width: 280px; }
+    #employeePanel { width: 300px; }
+    .drawer { width: 420px; }
+    .topbar-search { max-width: 220px; }
   }
 
-  /* ============ MOBILE ============ */
+  /* Mobile */
   @media (max-width: 768px) {
-    header h1 { font-size: 14px; }
-    header button { padding: 8px 10px; font-size: 12px; }
+    header.topbar { padding: 0 12px; gap: 10px; }
+    .brand span.word { font-size: 14px; }
+    .emp-count-badge { display: none; }
+    .topbar-search { max-width: none; }
 
     .layout { position: relative; }
-
     #employeePanel {
-      width: 100%; position: absolute; inset: 0; z-index: 10;
-      background: #0f172a;
+      width: 100%; position: absolute; inset: 0; z-index: 10; background: var(--ink);
     }
     #employeePanel.map-mode { display: none; }
-
     #map { position: absolute; inset: 0; width: 100%; }
     #map.list-mode { display: none; }
+    .view-switch-btn { display: inline-flex; }
 
-    .view-switch-btn {
-      display: inline-flex; align-items: center; gap: 6px;
-    }
+    .drawer-overlay { align-items: flex-end; }
+    .drawer { width: 100%; height: 92vh; border-left: none; border-top: 1px solid var(--border-soft); border-radius: 20px 20px 0 0; animation: slideUp 0.22s cubic-bezier(0.16,1,0.3,1); }
+    @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
-    .modal-box { max-height: 95vh; padding: 16px; }
-    .modal-actions button { min-width: 100%; }
+    .stat-grid { grid-template-columns: 1fr 1fr; }
+    .field-row { flex-direction: column; gap: 0; }
+  }
 
-    .emp-actions button { flex: 1; min-width: 70px; }
+  @media (max-width: 420px) {
+    .login-box { padding: 26px 20px; }
   }
 </style>
 </head>
 <body>
 
-<!-- LOGIN SCREEN -->
+<!-- ================= LOGIN ================= -->
 <div id="loginScreen">
-  <div class="login-box">
-    <h2>Manager Login</h2>
-    <input id="loginEmployeeId" placeholder="Employee ID" autocomplete="username" />
-    <input id="loginPassword" type="password" placeholder="Password" autocomplete="current-password" />
-    <button onclick="login()">Log In</button>
-    <div id="loginError" class="error-msg"></div>
+  <div class="login-wrap">
+    <div class="login-brand"><span class="radar-dot"></span><span>Dispatch Console</span></div>
+    <div class="login-box">
+      <h1>Manager sign in</h1>
+      <p class="sub">Track routes, punches and pay for your field team.</p>
+      <div class="field">
+        <label for="loginEmployeeId">Employee ID</label>
+        <input id="loginEmployeeId" placeholder="e.g. EMP001" autocomplete="username" />
+      </div>
+      <div class="field">
+        <label for="loginPassword">Password</label>
+        <input id="loginPassword" type="password" placeholder="••••••••" autocomplete="current-password" />
+      </div>
+      <button class="btn-primary" onclick="login()">Sign in</button>
+      <div id="loginError" class="login-error"></div>
+    </div>
   </div>
 </div>
 
-<!-- DASHBOARD -->
+<!-- ================= DASHBOARD ================= -->
 <div id="dashboard">
-  <header>
-    <h1>Employee Tracking Dashboard</h1>
-    <div class="header-actions">
-      <button class="view-switch-btn" onclick="toggleMobileView()">
-        <span id="viewSwitchLabel">Show Map</span>
-      </button>
-      <button onclick="logout()">Log Out</button>
+  <header class="topbar">
+    <div class="brand"><span class="radar-dot"></span><span class="word">Dispatch<em>.</em></span></div>
+    <div class="topbar-search">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input id="employeeSearch" placeholder="Search employees…" oninput="filterEmployees()" />
     </div>
+    <div class="topbar-spacer"></div>
+    <span class="emp-count-badge" id="empCountBadge">0 employees</span>
+    <button class="icon-btn view-switch-btn" onclick="toggleMobileView()"><span id="viewSwitchLabel">Map</span></button>
+    <button class="icon-btn" onclick="logout()">Log out</button>
   </header>
+
   <div class="layout">
     <div id="employeePanel">
-      <h3>Employees</h3>
+      <div class="roster-header"><h2>Field Team</h2></div>
       <div id="employeeList"></div>
 
-      <div class="add-form">
-        <h3>Add Employee</h3>
+      <button class="add-employee-toggle" onclick="toggleAddForm()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+        <span id="addFormToggleLabel">Add employee</span>
+      </button>
+      <div id="addForm" class="hidden">
         <input id="newEmpId" placeholder="Employee ID (e.g. EMP002)" />
-        <input id="newEmpName" placeholder="Full Name" />
+        <input id="newEmpName" placeholder="Full name" />
         <select id="newEmpRole">
           <option value="employee">Employee</option>
           <option value="manager">Manager</option>
         </select>
-        <input id="newEmpRate" type="number" step="0.01" placeholder="Pay Rate per Km (e.g. 10)" />
-        <input id="newEmpPassword" type="password" placeholder="Temporary Password" />
-        <button onclick="addEmployee()">Add Employee</button>
+        <input id="newEmpRate" type="number" step="0.01" placeholder="Pay rate per km (e.g. 10)" />
+        <input id="newEmpPassword" type="password" placeholder="Temporary password" />
+        <button onclick="addEmployee()">Create account</button>
       </div>
     </div>
     <div id="map"></div>
   </div>
 </div>
 
-<!-- EMPLOYEE DETAIL / EDIT MODAL -->
-<div id="detailModal" class="modal-overlay hidden">
-  <div class="modal-box">
-    <h2 id="detailName">Employee</h2>
-    <div id="detailStats" class="detail-stats-row"></div>
-
-    <h3 style="margin-bottom:6px;">Daily Summary (Punch In → Out, Km travelled)</h3>
-    <div id="dailyList"></div>
-
-    <h3 style="margin-bottom:6px; margin-top:20px;">Edit Employee</h3>
-    <input id="editName" placeholder="Full Name" />
-    <input id="editPhone" placeholder="Phone (optional)" />
-    <input id="editRate" type="number" step="0.01" placeholder="Pay Rate per Km (e.g. 10)" />
-    <input id="editPassword" type="password" placeholder="New Password (leave blank to keep current)" />
-
-    <div class="settings-block">
-      <h4>Account Status</h4>
-      <div class="settings-row">
-        <label class="toggle-switch">
-          <input type="checkbox" id="editActive" />
-          <span class="toggle-slider"></span>
-        </label>
-        <span id="editActiveLabel" style="font-size:13px; color:#cbd5e1;">Enabled — can punch in/ping</span>
+<!-- ================= DETAIL DRAWER ================= -->
+<div id="detailModal" class="drawer-overlay hidden" onclick="if(event.target===this) closeModal()">
+  <div class="drawer">
+    <div class="drawer-head">
+      <div class="drawer-head-top">
+        <div>
+          <div class="drawer-title" id="detailName">Employee</div>
+          <div class="drawer-sub" id="detailSub"></div>
+        </div>
+        <button class="drawer-close" onclick="closeModal()">✕</button>
+      </div>
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="overview" onclick="switchTab('overview')">Overview</button>
+        <button class="tab-btn" data-tab="daily" onclick="switchTab('daily')">Daily Log</button>
+        <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">Settings</button>
       </div>
     </div>
 
-    <div class="settings-block">
-      <h4>Start Point &amp; End Point (used for Km/Pay calculation)</h4>
-      <div class="settings-row">
-        <label>Start Point</label>
-        <input class="coord-input" id="editStartLat" placeholder="latitude" />
-        <input class="coord-input" id="editStartLng" placeholder="longitude" />
-      </div>
-      <div class="settings-row">
-        <label>End Point</label>
-        <input class="coord-input" id="editEndLat" placeholder="latitude" />
-        <input class="coord-input" id="editEndLng" placeholder="longitude" />
-      </div>
-    </div>
+    <div class="drawer-body">
 
-    <div class="settings-block">
-      <h4>Auto-Tracking Schedule (silent background tracking, independent of Punch In/Out)</h4>
-      <div id="scheduleDays"></div>
-      <div class="time-row">
-        Start <input type="time" id="scheduleStart" />
-        End <input type="time" id="scheduleEnd" />
+      <!-- OVERVIEW TAB -->
+      <div class="tab-panel active" id="tab-overview">
+        <div class="stat-grid" id="detailStats"></div>
+        <button class="btn-secondary" onclick="downloadReport(currentDetailEmployeeId)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          Download CSV report
+        </button>
       </div>
-      <div class="settings-row" style="align-items:center;">
-        <label style="min-width:110px; color:#cbd5e1;">Ping every</label>
-        <input list="scheduleIntervalOptions" id="scheduleInterval" class="coord-input" type="number" min="1" step="1" placeholder="minutes" style="max-width:140px;" />
-        <datalist id="scheduleIntervalOptions">
-          <option value="5">5 min</option>
-          <option value="15">15 min</option>
-          <option value="30">30 min</option>
-          <option value="60">1 hour</option>
-          <option value="120">2 hours</option>
-          <option value="180">3 hours</option>
-        </datalist>
-        <span style="font-size:13px; color:#cbd5e1; margin-left:8px;">minutes</span>
-      </div>
-      <div class="settings-row" style="margin-top:8px;">
-        <label class="toggle-switch">
-          <input type="checkbox" id="scheduleEnabled" />
-          <span class="toggle-slider"></span>
-        </label>
-        <span style="font-size:13px; color:#cbd5e1;">Schedule active</span>
-      </div>
-    </div>
 
-    <div class="modal-actions">
-      <button class="btn-save" onclick="saveEdit()">Save Changes</button>
-      <button class="btn-cancel" onclick="closeModal()">Close</button>
-    </div>
-    <div class="modal-actions">
-      <button class="btn-danger" onclick="permanentDelete()">Permanently Delete Account</button>
+      <!-- DAILY LOG TAB -->
+      <div class="tab-panel" id="tab-daily">
+        <div id="dailyList"></div>
+      </div>
+
+      <!-- SETTINGS TAB -->
+      <div class="tab-panel" id="tab-settings">
+        <div class="field">
+          <label>Full name</label>
+          <input id="editName" placeholder="Full name" />
+        </div>
+        <div class="field">
+          <label>Phone (optional)</label>
+          <input id="editPhone" placeholder="Phone" />
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Pay rate per km (₹)</label>
+            <input id="editRate" type="number" step="0.01" placeholder="10" />
+          </div>
+        </div>
+        <div class="field">
+          <label>New password</label>
+          <input id="editPassword" type="password" placeholder="Leave blank to keep current" />
+        </div>
+
+        <div class="settings-block">
+          <h4>Account status</h4>
+          <div class="settings-row">
+            <label class="chip-toggle">
+              <input type="checkbox" id="editActive" />
+              <span class="chip-slider"></span>
+            </label>
+            <span id="editActiveLabel" style="font-size:12.5px; color:var(--text-dim);">Enabled — can punch in/ping</span>
+          </div>
+        </div>
+
+        <div class="settings-block">
+          <h4>Start &amp; End Point <span style="font-weight:400; text-transform:none; color:var(--text-faint);">— used for km/pay calculation</span></h4>
+          <div class="settings-row">
+            <label>Start</label>
+            <input class="coord-input" id="editStartLat" placeholder="latitude" />
+            <input class="coord-input" id="editStartLng" placeholder="longitude" />
+          </div>
+          <div class="settings-row">
+            <label>End</label>
+            <input class="coord-input" id="editEndLat" placeholder="latitude" />
+            <input class="coord-input" id="editEndLng" placeholder="longitude" />
+          </div>
+        </div>
+
+        <div class="settings-block">
+          <h4>Auto-tracking schedule <span style="font-weight:400; text-transform:none; color:var(--text-faint);">— silent, independent of punch in/out</span></h4>
+          <div class="day-chips" id="scheduleDays"></div>
+          <div class="time-row">
+            <input type="time" id="scheduleStart" />
+            <input type="time" id="scheduleEnd" />
+          </div>
+          <div class="settings-row" style="margin-top:12px;">
+            <label style="min-width:70px;">Every</label>
+            <input list="scheduleIntervalOptions" id="scheduleInterval" class="coord-input" type="number" min="1" step="1" placeholder="minutes" style="max-width:110px; flex:none;" />
+            <datalist id="scheduleIntervalOptions">
+              <option value="5">5 min</option>
+              <option value="15">15 min</option>
+              <option value="30">30 min</option>
+              <option value="60">1 hour</option>
+              <option value="120">2 hours</option>
+              <option value="180">3 hours</option>
+            </datalist>
+            <span style="font-size:12px; color:var(--text-faint);">minutes</span>
+          </div>
+          <div class="settings-row" style="margin-top:12px;">
+            <label class="chip-toggle">
+              <input type="checkbox" id="scheduleEnabled" />
+              <span class="chip-slider"></span>
+            </label>
+            <span style="font-size:12.5px; color:var(--text-dim);">Schedule active</span>
+          </div>
+        </div>
+
+        <div class="save-bar">
+          <button class="btn-save" onclick="saveEdit()">Save changes</button>
+        </div>
+
+        <div class="danger-zone">
+          <button class="btn-danger-full" onclick="permanentDelete()">Permanently delete account</button>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
 
-<!-- PHOTO ZOOM MODAL -->
+<!-- ================= PHOTO ZOOM MODAL ================= -->
 <div id="photoModal" class="hidden" onclick="closePhotoModal()">
   <span class="close-x">&times;</span>
   <img id="photoModalImg" src="" />
 </div>
+
+<div id="toastContainer"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
   const API_BASE = window.location.origin;
   let token = localStorage.getItem("adminToken") || "";
   let map, markers = {};
-  let mobileViewMode = "list"; // "list" or "map" - only relevant on small screens
+  let mobileViewMode = "list";
   const DAYS = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"];
+  let allUsers = [];
+  let currentDetailEmployeeId = null;
+  let lastLoadedDays = [];
+  let routeLayerGroup = null;
+  let liveTrackingEmployeeId = null;
+  let liveTrackingInterval = null;
+  let liveRouteLayerGroup = null;
+
+  // ---------- Toasts ----------
+  function showToast(message, type) {
+    const container = document.getElementById("toastContainer");
+    const el = document.createElement("div");
+    el.className = `toast ${type || "success"}`;
+    el.textContent = message;
+    container.appendChild(el);
+    setTimeout(() => { el.style.opacity = "0"; el.style.transition = "opacity 0.25s"; setTimeout(() => el.remove(), 250); }, 2600);
+  }
 
   // ---------- Mobile view switch ----------
   function toggleMobileView() {
     mobileViewMode = mobileViewMode === "list" ? "map" : "list";
     applyMobileView();
   }
-
   function applyMobileView() {
     const panel = document.getElementById("employeePanel");
     const mapEl = document.getElementById("map");
     const label = document.getElementById("viewSwitchLabel");
-
     if (mobileViewMode === "map") {
       panel.classList.add("map-mode");
       mapEl.classList.remove("list-mode");
-      label.textContent = "Show List";
+      label.textContent = "List";
       if (map) setTimeout(() => map.invalidateSize(), 100);
     } else {
       panel.classList.remove("map-mode");
       mapEl.classList.add("list-mode");
-      label.textContent = "Show Map";
+      label.textContent = "Map";
     }
+  }
+
+  // ---------- Add-employee accordion ----------
+  function toggleAddForm() {
+    const form = document.getElementById("addForm");
+    const label = document.getElementById("addFormToggleLabel");
+    form.classList.toggle("hidden");
+    label.textContent = form.classList.contains("hidden") ? "Add employee" : "Cancel";
   }
 
   // ---------- Login ----------
@@ -414,20 +655,14 @@
     const password = document.getElementById("loginPassword").value;
     const errorBox = document.getElementById("loginError");
     errorBox.textContent = "";
-
     try {
       const res = await fetch(`${API_BASE}/api/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ employeeId, password }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Login failed");
-
-      if (data.user.role !== "manager") {
-        throw new Error("This account is not a manager. Use a manager account.");
-      }
-
+      if (data.user.role !== "manager") throw new Error("This account is not a manager. Use a manager account.");
       token = data.token;
       localStorage.setItem("adminToken", token);
       showDashboard();
@@ -461,129 +696,141 @@
     setTimeout(() => map.invalidateSize(), 200);
   }
 
-  window.addEventListener("resize", () => {
-    if (map) setTimeout(() => map.invalidateSize(), 100);
-  });
-
-  let allUsers = [];
+  window.addEventListener("resize", () => { if (map) setTimeout(() => map.invalidateSize(), 100); });
 
   async function loadEmployees() {
     try {
-      const res = await fetch(`${API_BASE}/api/auth/users`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(`${API_BASE}/api/auth/users`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to load employees");
-
       allUsers = data.users;
-      renderEmployeeList(data.users);
+      filterEmployees();
       renderMapMarkers(data.users);
+      const empOnly = data.users.filter(u => u.role !== "manager");
+      document.getElementById("empCountBadge").textContent = `${empOnly.length} employee${empOnly.length === 1 ? "" : "s"}`;
     } catch (err) {
-      alert(err.message);
+      showToast(err.message, "error");
     }
+  }
+
+  function filterEmployees() {
+    const q = (document.getElementById("employeeSearch")?.value || "").toLowerCase().trim();
+    const filtered = !q ? allUsers : allUsers.filter(u =>
+      u.name.toLowerCase().includes(q) || u.employeeId.toLowerCase().includes(q)
+    );
+    renderEmployeeList(filtered);
+  }
+
+  function initials(name) {
+    return name.split(" ").filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join("");
   }
 
   function renderEmployeeList(users) {
     const list = document.getElementById("employeeList");
     list.innerHTML = "";
+
+    if (!users.length) {
+      list.innerHTML = `<div class="empty-state">No employees match that search.</div>`;
+      return;
+    }
+
     users.forEach((u) => {
-      const row = document.createElement("div");
-      row.className = "emp-row";
-      const lastSeen = u.lastLocation?.timestamp
-        ? new Date(u.lastLocation.timestamp).toLocaleString()
-        : "Never";
-      const loginDevice = u.lastDevice?.deviceName || u.lastDevice?.deviceId
+      const card = document.createElement("div");
+      card.className = "emp-card";
+      const lastSeen = u.lastLocation?.timestamp ? new Date(u.lastLocation.timestamp).toLocaleString() : "Never";
+      const loginDevice = (u.lastDevice?.deviceName || u.lastDevice?.deviceId)
         ? `${u.lastDevice.deviceName || "unknown"}${u.lastDevice.deviceId ? " · " + u.lastDevice.deviceId : ""}`
         : "No login recorded";
-      row.innerHTML = `
-        <div style="width:100%;">
-          <div onclick="openDetail('${u.employeeId}')">
-            <div class="name">${u.name} (${u.employeeId})</div>
-            <div class="sub">${u.role} · last seen: ${lastSeen}</div>
-            <div class="sub">Last login device: ${loginDevice}</div>
+
+      const actionsHtml = u.role !== "manager" ? `
+        <div class="emp-card-actions">
+          <label class="chip-toggle" onclick="event.stopPropagation()">
+            <input type="checkbox" ${u.active ? "checked" : ""} onchange="toggleActive('${u.employeeId}', this.checked)">
+            <span class="chip-slider"></span>
+          </label>
+          <button class="mini-btn ${liveTrackingEmployeeId === u.employeeId ? "live-on" : ""}" onclick="event.stopPropagation(); toggleLiveTracking('${u.employeeId}')">
+            ${liveTrackingEmployeeId === u.employeeId ? "● Live" : "Track live"}
+          </button>
+          <button class="mini-btn danger" onclick="event.stopPropagation(); removeEmployee('${u.employeeId}')">Remove</button>
+        </div>` : `<div class="emp-card-actions"><span class="mini-btn" style="cursor:default;">Manager</span></div>`;
+
+      card.innerHTML = `
+        <div class="emp-card-top" onclick="openDetail('${u.employeeId}')">
+          <div class="avatar">${initials(u.name)}<span class="status-dot ${u.active ? "on" : ""}"></span></div>
+          <div style="min-width:0;">
+            <div class="emp-card-name">${u.name}</div>
+            <div class="emp-card-id">${u.employeeId}</div>
           </div>
-          ${u.role !== "manager" ? `
-            <div class="emp-actions">
-              <label class="toggle-switch" onclick="event.stopPropagation()">
-                <input type="checkbox" ${u.active ? "checked" : ""} onchange="toggleActive('${u.employeeId}', this.checked)">
-                <span class="toggle-slider"></span>
-              </label>
-              <span class="status-pill ${u.active ? "on" : "off"}">${u.active ? "Enabled" : "Disabled"}</span>
-              <button class="btn-live ${liveTrackingEmployeeId === u.employeeId ? 'active' : ''}" onclick="event.stopPropagation(); toggleLiveTracking('${u.employeeId}')">
-                ${liveTrackingEmployeeId === u.employeeId ? 'Stop Live' : 'Track Live'}
-              </button>
-              <button class="btn-edit" onclick="event.stopPropagation(); openDetail('${u.employeeId}')">Edit</button>
-              <button class="btn-remove" onclick="event.stopPropagation(); removeEmployee('${u.employeeId}')">Remove</button>
-            </div>` : ""}
         </div>
+        <div class="emp-card-meta" onclick="openDetail('${u.employeeId}')">
+          <span>Last seen <span class="dim">${lastSeen}</span></span>
+          <span>Device <span class="dim">${loginDevice}</span></span>
+        </div>
+        ${actionsHtml}
       `;
-      list.appendChild(row);
+      list.appendChild(card);
     });
   }
 
-  // Quick enable/disable straight from the list toggle
   async function toggleActive(employeeId, active) {
     try {
       const res = await fetch(`${API_BASE}/api/auth/users/${employeeId}/toggle-active`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ active }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to update status");
+      showToast(active ? "Employee enabled" : "Employee disabled", "success");
       await loadEmployees();
     } catch (err) {
-      alert(err.message);
-      await loadEmployees(); // revert the toggle visually if it failed
+      showToast(err.message, "error");
+      await loadEmployees();
     }
   }
 
-  let currentDetailEmployeeId = null;
+  // ---------- Tabs ----------
+  function switchTab(tab) {
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+    document.querySelectorAll(".tab-panel").forEach(p => p.classList.toggle("active", p.id === `tab-${tab}`));
+  }
 
+  // ---------- Detail drawer ----------
   async function openDetail(employeeId) {
     currentDetailEmployeeId = employeeId;
     document.getElementById("detailModal").classList.remove("hidden");
-    document.getElementById("detailName").textContent = "Loading...";
+    document.getElementById("detailName").textContent = "Loading…";
     document.getElementById("dailyList").innerHTML = "";
+    switchTab("overview");
 
     try {
-      const usersRes = await fetch(`${API_BASE}/api/auth/users`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const usersRes = await fetch(`${API_BASE}/api/auth/users`, { headers: { Authorization: `Bearer ${token}` } });
       const usersData = await usersRes.json();
       const emp = usersData.users.find((u) => u.employeeId === employeeId);
 
-      document.getElementById("detailName").textContent = `${emp.name} (${emp.employeeId})`;
+      document.getElementById("detailName").textContent = emp.name;
+      document.getElementById("detailSub").textContent = emp.employeeId;
       document.getElementById("editName").value = emp.name;
       document.getElementById("editPhone").value = emp.phone || "";
       document.getElementById("editRate").value = emp.ratePerKm || 0;
       document.getElementById("editPassword").value = "";
 
-      // Enable/Disable
       document.getElementById("editActive").checked = !!emp.active;
-      document.getElementById("editActiveLabel").textContent = emp.active
-        ? "Enabled — can punch in/ping"
-        : "Disabled — cannot punch in/ping";
+      document.getElementById("editActiveLabel").textContent = emp.active ? "Enabled — can punch in/ping" : "Disabled — cannot punch in/ping";
       document.getElementById("editActive").onchange = (e) => {
-        document.getElementById("editActiveLabel").textContent = e.target.checked
-          ? "Enabled — can punch in/ping"
-          : "Disabled — cannot punch in/ping";
+        document.getElementById("editActiveLabel").textContent = e.target.checked ? "Enabled — can punch in/ping" : "Disabled — cannot punch in/ping";
       };
 
-      // Start/End point
-      const sp = emp.startPoint || {};
-      const ep = emp.endPoint || {};
+      const sp = emp.startPoint || {}; const ep = emp.endPoint || {};
       document.getElementById("editStartLat").value = sp.latitude ?? "";
       document.getElementById("editStartLng").value = sp.longitude ?? "";
       document.getElementById("editEndLat").value = ep.latitude ?? "";
       document.getElementById("editEndLng").value = ep.longitude ?? "";
 
-      // Schedule
       const sched = emp.autoSchedule || { enabled: false, days: [], startTime: "08:00", endTime: "20:00", intervalMinutes: 30 };
       const dayBox = document.getElementById("scheduleDays");
       dayBox.innerHTML = DAYS.map(d => `
-        <label class="day-chip">
-          <input type="checkbox" id="day-${d}" ${sched.days.includes(d) ? "checked" : ""}/> ${d.slice(0,3)}
+        <label class="day-chip ${sched.days.includes(d) ? "checked" : ""}" onclick="this.classList.toggle('checked')">
+          <input type="checkbox" id="day-${d}" ${sched.days.includes(d) ? "checked" : ""} onclick="event.stopPropagation(); this.parentElement.classList.toggle('checked', this.checked)"/>${d.slice(0,3)}
         </label>
       `).join("");
       document.getElementById("scheduleStart").value = sched.startTime || "08:00";
@@ -591,47 +838,35 @@
       document.getElementById("scheduleInterval").value = sched.intervalMinutes || 30;
       document.getElementById("scheduleEnabled").checked = !!sched.enabled;
 
-      const dailyRes = await fetch(`${API_BASE}/api/reports/daily/${employeeId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const dailyRes = await fetch(`${API_BASE}/api/reports/daily/${employeeId}`, { headers: { Authorization: `Bearer ${token}` } });
       const dailyData = await dailyRes.json();
       if (!dailyRes.ok) throw new Error(dailyData.error || "Failed to load daily summary");
 
       document.getElementById("detailStats").innerHTML = `
-        <span>Rate: ₹${dailyData.ratePerKm}/km</span>
-        <span style="color:#22c55e; font-weight:bold;">Total Pay Due: ₹${dailyData.totals.pay}</span>
-        <span>Total Km: ${dailyData.totals.totalKm} (Billable: ${dailyData.totals.billableKm}, Personal: ${dailyData.totals.personalKm})</span>
-        <button class="btn-download" onclick="downloadReport('${employeeId}')">Download CSV</button>
+        <div class="stat-card"><div class="label">Rate</div><div class="value">₹${dailyData.ratePerKm}/km</div></div>
+        <div class="stat-card accent"><div class="label">Pay due</div><div class="value">₹${dailyData.totals.pay}</div></div>
+        <div class="stat-card"><div class="label">Billable km</div><div class="value">${dailyData.totals.billableKm}</div></div>
+        <div class="stat-card"><div class="label">Personal km</div><div class="value">${dailyData.totals.personalKm}</div></div>
       `;
 
       renderDailySummary(dailyData.days);
     } catch (err) {
-      document.getElementById("detailStats").textContent = "Error: " + err.message;
+      document.getElementById("detailStats").innerHTML = `<div class="empty-state" style="grid-column:span 2;">Error: ${err.message}</div>`;
     }
   }
 
-  let lastLoadedDays = [];
-
   async function downloadReport(employeeId) {
     try {
-      const res = await fetch(`${API_BASE}/api/reports/export/${employeeId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Download failed");
-      }
+      const res = await fetch(`${API_BASE}/api/reports/export/${employeeId}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) { const data = await res.json(); throw new Error(data.error || "Download failed"); }
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url;
-      a.download = `${employeeId}-report.csv`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      a.href = url; a.download = `${employeeId}-report.csv`;
+      document.body.appendChild(a); a.click(); a.remove();
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      alert(err.message);
+      showToast(err.message, "error");
     }
   }
 
@@ -639,7 +874,7 @@
     lastLoadedDays = days;
     const list = document.getElementById("dailyList");
     if (!days.length) {
-      list.innerHTML = `<div style="color:#94a3b8; font-size:13px;">No activity recorded yet.</div>`;
+      list.innerHTML = `<div class="empty-state">No activity recorded yet.</div>`;
       return;
     }
     list.innerHTML = "";
@@ -648,17 +883,17 @@
       const inTime = d.punchInTime ? new Date(d.punchInTime).toLocaleTimeString() : "—";
       const outTime = d.punchOutTime ? new Date(d.punchOutTime).toLocaleTimeString() : "—";
       const row = document.createElement("div");
-      row.className = "day-row";
+      row.className = "day-block";
 
       const manualHtml = d.manualPunches.map((p) => `
         <div class="point-row">
-          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+          <div class="point-row-top">
             <div>
               <b>${p.type === "in" ? "PUNCH IN" : "PUNCH OUT"}</b> · ${new Date(p.timestamp).toLocaleTimeString()}
-              ${p.punchCategory ? `<div style="margin-top:4px;"><span class="cat-tag ${p.punchCategory}">${p.punchCategory}${p.workType ? " · " + p.workType : ""}</span></div>` : ""}
-              <br><span class="mono">${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)}</span><br>
+              ${p.punchCategory ? `<div><span class="cat-tag ${p.punchCategory}">${p.punchCategory}${p.workType ? " · " + p.workType : ""}</span></div>` : ""}
+              <div class="mono" style="margin-top:5px;">${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)}</div>
               ${p.placeName ? `<span class="place">${p.placeName}</span>` : ""}
-              ${(p.deviceName || p.deviceId) ? `<span class="device-tag">Device: ${p.deviceName || "unknown"} ${p.deviceId ? "· " + p.deviceId : ""}</span>` : ""}
+              ${(p.deviceName || p.deviceId) ? `<span class="device-tag">${p.deviceName || "unknown"} ${p.deviceId ? "· " + p.deviceId : ""}</span>` : ""}
               ${p.photoBase64 ? `<img class="punch-photo" src="${p.photoBase64}" onclick="showPhoto('${p.photoBase64}')" />` : ""}
             </div>
             <button class="btn-delete-point" onclick="deleteRecord('punch', '${p._id}')">✕</button>
@@ -668,12 +903,12 @@
 
       const autoHtml = d.autoPings.map((p) => `
         <div class="point-row">
-          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+          <div class="point-row-top">
             <div>
-              <b>Auto point</b> · ${new Date(p.timestamp).toLocaleTimeString()} · ${p.cumulativeKm} km so far<br>
-              <span class="mono">${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)}</span><br>
+              <b>Auto point</b> · ${new Date(p.timestamp).toLocaleTimeString()} · ${p.cumulativeKm} km so far
+              <div class="mono" style="margin-top:5px;">${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)}</div>
               ${p.placeName ? `<span class="place">${p.placeName}</span>` : ""}
-              ${(p.deviceName || p.deviceId) ? `<span class="device-tag">Device: ${p.deviceName || "unknown"} ${p.deviceId ? "· " + p.deviceId : ""}</span>` : ""}
+              ${(p.deviceName || p.deviceId) ? `<span class="device-tag">${p.deviceName || "unknown"} ${p.deviceId ? "· " + p.deviceId : ""}</span>` : ""}
             </div>
             <button class="btn-delete-point" onclick="deleteRecord('ping', '${p._id}')">✕</button>
           </div>
@@ -681,18 +916,20 @@
       `).join("");
 
       row.innerHTML = `
-        <div class="date">${d.date}</div>
-        <div class="stat">Punch: ${inTime} → ${outTime} &nbsp;|&nbsp; Manual: ${d.punchCount} &nbsp;|&nbsp; Auto: ${d.pingCount}</div>
-        <div class="stat">Total: ${d.totalKm} km &nbsp;|&nbsp; Billable: ${d.billableKm} km &nbsp;|&nbsp; Personal: ${d.personalKm} km</div>
-        <div class="stat" style="color:#22c55e; font-weight:bold;">Pay: ₹${d.pay}</div>
+        <div class="day-block-head">
+          <span class="day-date">${d.date}</span>
+          <span class="day-pay">₹${d.pay}</span>
+        </div>
+        <div class="day-line">${inTime} → ${outTime} · ${d.totalKm} km total</div>
+        <div class="day-line">Manual ${d.punchCount} · Auto ${d.pingCount} · Billable ${d.billableKm} km</div>
 
-        ${d.route.length > 0 ? `<button class="btn-route" onclick="showRouteOnMap(${realIdx})">View Route on Map</button>` : ""}
+        ${d.route.length > 0 ? `<button class="btn-route" onclick="showRouteOnMap(${realIdx})">View route on map</button>` : ""}
 
-        <div class="section-toggle" onclick="toggleSection(this)">▸ Manual Punches (${d.punchCount})</div>
-        <div class="section-body hidden">${manualHtml || '<div class="stat">None</div>'}</div>
+        <div class="section-toggle" onclick="toggleSection(this)">▸ Manual punches (${d.punchCount})</div>
+        <div class="section-body hidden">${manualHtml || '<div class="day-line">None</div>'}</div>
 
-        <div class="section-toggle" onclick="toggleSection(this)">▸ Auto Track Points (${d.pingCount})</div>
-        <div class="section-body hidden">${autoHtml || '<div class="stat">None</div>'}</div>
+        <div class="section-toggle" onclick="toggleSection(this)">▸ Auto track points (${d.pingCount})</div>
+        <div class="section-body hidden">${autoHtml || '<div class="day-line">None</div>'}</div>
       `;
       list.appendChild(row);
     });
@@ -702,15 +939,13 @@
     if (!confirm("Delete this record permanently? This cannot be undone.")) return;
     try {
       const endpoint = type === "punch" ? "punch" : "tracking";
-      const res = await fetch(`${API_BASE}/api/${endpoint}/record/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(`${API_BASE}/api/${endpoint}/record/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to delete record");
+      showToast("Record deleted", "success");
       if (currentDetailEmployeeId) await openDetail(currentDetailEmployeeId);
     } catch (err) {
-      alert(err.message);
+      showToast(err.message, "error");
     }
   }
 
@@ -720,23 +955,12 @@
     el.textContent = el.textContent.replace(el.textContent[0], body.classList.contains("hidden") ? "▸" : "▾");
   }
 
-  // ---------- Photo zoom ----------
   function showPhoto(src) {
     document.getElementById("photoModalImg").src = src;
     document.getElementById("photoModal").classList.remove("hidden");
   }
-  function closePhotoModal() {
-    document.getElementById("photoModal").classList.add("hidden");
-  }
+  function closePhotoModal() { document.getElementById("photoModal").classList.add("hidden"); }
 
-  let routeLayerGroup = null;
-
-  // Snaps GPS points to actual roads using the free public OSRM routing
-  // service, so the blue line follows streets instead of cutting straight
-  // between sparse points. Falls back to the straight line if it fails
-  // (e.g. too many points, or the free server is temporarily overloaded -
-  // this public demo server isn't meant for heavy production traffic; for
-  // serious scale, self-host OSRM or use a paid routing API instead).
   async function snapRouteToRoads(latlngs) {
     if (latlngs.length < 2) return null;
     try {
@@ -746,7 +970,6 @@
       if (!res.ok) return null;
       const data = await res.json();
       if (data.code !== "Ok" || !data.routes?.[0]) return null;
-      // GeoJSON is [lon, lat] - Leaflet wants [lat, lon]
       return data.routes[0].geometry.coordinates.map((c) => [c[1], c[0]]);
     } catch (err) {
       console.log("Road snapping failed, using straight line:", err.message);
@@ -759,29 +982,38 @@
     if (!day || !day.route.length) return;
 
     closeModal();
-    if (window.innerWidth <= 768) {
-      mobileViewMode = "map";
-      applyMobileView();
-    }
+    if (window.innerWidth <= 768) { mobileViewMode = "map"; applyMobileView(); }
 
     if (routeLayerGroup) map.removeLayer(routeLayerGroup);
     routeLayerGroup = L.layerGroup().addTo(map);
 
     const latlngs = day.route.map((p) => [p.latitude, p.longitude]);
-
-    // Try to snap to roads; fall back to straight line if it fails
-    const snapped = await snapRouteToRoads(latlngs);
-    L.polyline(snapped || latlngs, { color: "#3b82f6", weight: 4 }).addTo(routeLayerGroup);
-
     const first = day.route[0];
+    const last = day.route[day.route.length - 1];
     const isFirstAnchor = first.kind === "start_point";
+    const isLastAnchor = last.kind === "end_point";
 
-    // Fixed Start Point anchors are drawn as an orange "base" marker so
-    // they're visually distinct from a real recorded GPS point.
+    const realStartIdx = isFirstAnchor ? 1 : 0;
+    const realEndIdx = isLastAnchor ? latlngs.length - 2 : latlngs.length - 1;
+    const realRoute = latlngs.slice(realStartIdx, realEndIdx + 1);
+
+    if (isFirstAnchor && realRoute.length) {
+      L.polyline([latlngs[0], realRoute[0]], { color: "#facc15", weight: 4, dashArray: "8,8" })
+        .addTo(routeLayerGroup).bindPopup("Assumed leg: Start Point → first activity");
+    }
+    if (realRoute.length > 1) {
+      const snapped = await snapRouteToRoads(realRoute);
+      L.polyline(snapped || realRoute, { color: "#4ea1f7", weight: 4 }).addTo(routeLayerGroup);
+    }
+    if (isLastAnchor && realRoute.length) {
+      L.polyline([realRoute[realRoute.length - 1], latlngs[latlngs.length - 1]], { color: "#facc15", weight: 4, dashArray: "8,8" })
+        .addTo(routeLayerGroup).bindPopup("Assumed leg: last activity → End Point");
+    }
+
     const startIcon = L.divIcon({
       html: isFirstAnchor
         ? '<div style="background:#f59e0b;width:20px;height:20px;border-radius:50%;border:3px solid white;display:flex;align-items:center;justify-content:center;font-size:11px;">🏠</div>'
-        : '<div style="background:#22c55e;width:16px;height:16px;border-radius:50%;border:3px solid white;"></div>',
+        : '<div style="background:#34d399;width:16px;height:16px;border-radius:50%;border:3px solid white;"></div>',
       className: "", iconSize: isFirstAnchor ? [20, 20] : [16, 16],
     });
     const startLabel = isFirstAnchor
@@ -790,13 +1022,10 @@
     L.marker(latlngs[0], { icon: startIcon }).addTo(routeLayerGroup).bindPopup(startLabel);
 
     if (latlngs.length > 1) {
-      const last = day.route[day.route.length - 1];
-      const isLastAnchor = last.kind === "end_point";
-
       const endIcon = L.divIcon({
         html: isLastAnchor
           ? '<div style="background:#f59e0b;width:20px;height:20px;border-radius:50%;border:3px solid white;display:flex;align-items:center;justify-content:center;font-size:11px;">🏠</div>'
-          : '<div style="background:#ef4444;width:16px;height:16px;border-radius:50%;border:3px solid white;"></div>',
+          : '<div style="background:#f5455c;width:16px;height:16px;border-radius:50%;border:3px solid white;"></div>',
         className: "", iconSize: isLastAnchor ? [20, 20] : [16, 16],
       });
       const endLabel = isLastAnchor
@@ -805,10 +1034,7 @@
       L.marker(latlngs[latlngs.length - 1], { icon: endIcon }).addTo(routeLayerGroup).bindPopup(endLabel);
     }
 
-    setTimeout(() => {
-      map.invalidateSize();
-      map.fitBounds(latlngs, { padding: [40, 40] });
-    }, 150);
+    setTimeout(() => { map.invalidateSize(); map.fitBounds(latlngs, { padding: [40, 40] }); }, 150);
   }
 
   function closeModal() {
@@ -835,14 +1061,11 @@
 
     try {
       const res = await fetch(`${API_BASE}/api/auth/users/${currentDetailEmployeeId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify(body),
+        method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to save changes");
 
-      // Save the auto-tracking schedule separately
       const days = DAYS.filter(d => document.getElementById(`day-${d}`).checked);
       const startTime = document.getElementById("scheduleStart").value;
       const endTime = document.getElementById("scheduleEnd").value;
@@ -850,81 +1073,59 @@
       const enabled = document.getElementById("scheduleEnabled").checked;
 
       const schedRes = await fetch(`${API_BASE}/api/auth/users/${currentDetailEmployeeId}/schedule`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ enabled, days, startTime, endTime, intervalMinutes }),
       });
       const schedData = await schedRes.json();
       if (!schedRes.ok) throw new Error(schedData.error || "Failed to save schedule");
 
-      alert("Saved successfully");
+      showToast("Changes saved", "success");
       closeModal();
       await loadEmployees();
     } catch (err) {
-      alert(err.message);
+      showToast(err.message, "error");
     }
   }
 
   async function permanentDelete() {
     if (!confirm(`Permanently delete ${currentDetailEmployeeId}? This cannot be undone (their punch/ping history stays, but they can never log in again).`)) return;
     try {
-      const res = await fetch(`${API_BASE}/api/auth/users/${currentDetailEmployeeId}/permanent`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(`${API_BASE}/api/auth/users/${currentDetailEmployeeId}/permanent`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to delete");
+      showToast("Account deleted", "success");
       closeModal();
       await loadEmployees();
     } catch (err) {
-      alert(err.message);
+      showToast(err.message, "error");
     }
   }
 
-  // ---------- Live Tracking ----------
-  let liveTrackingEmployeeId = null;
-  let liveTrackingInterval = null;
-  let liveRouteLayerGroup = null;
-
+  // ---------- Live tracking ----------
   function toggleLiveTracking(employeeId) {
-    if (liveTrackingEmployeeId === employeeId) {
-      stopLiveTracking();
-    } else {
-      startLiveTracking(employeeId);
-    }
+    if (liveTrackingEmployeeId === employeeId) stopLiveTracking(); else startLiveTracking(employeeId);
   }
-
   function startLiveTracking(employeeId) {
     stopLiveTracking();
     liveTrackingEmployeeId = employeeId;
-    if (window.innerWidth <= 768) {
-      mobileViewMode = "map";
-      applyMobileView();
-    }
+    if (window.innerWidth <= 768) { mobileViewMode = "map"; applyMobileView(); }
     refreshLiveTrack();
     liveTrackingInterval = setInterval(refreshLiveTrack, 20000);
     loadEmployees();
   }
-
   function stopLiveTracking() {
     if (liveTrackingInterval) clearInterval(liveTrackingInterval);
     liveTrackingInterval = null;
     liveTrackingEmployeeId = null;
-    if (liveRouteLayerGroup) {
-      map.removeLayer(liveRouteLayerGroup);
-      liveRouteLayerGroup = null;
-    }
+    if (liveRouteLayerGroup) { map.removeLayer(liveRouteLayerGroup); liveRouteLayerGroup = null; }
     loadEmployees();
   }
-
   async function refreshLiveTrack() {
     if (!liveTrackingEmployeeId) return;
     try {
       const today = new Date();
       const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
-      const res = await fetch(`${API_BASE}/api/reports/daily/${liveTrackingEmployeeId}?from=${startOfDay}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(`${API_BASE}/api/reports/daily/${liveTrackingEmployeeId}?from=${startOfDay}`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to load live track");
       const todayData = data.days.find((d) => d.date === toLocalDateKey(today));
@@ -934,31 +1135,23 @@
       console.log("Live tracking refresh failed:", err.message);
     }
   }
-
   function toLocalDateKey(date) {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
   }
-
   async function drawLiveRoute(route) {
     if (liveRouteLayerGroup) map.removeLayer(liveRouteLayerGroup);
     liveRouteLayerGroup = L.layerGroup().addTo(map);
-
     const latlngs = route.map((p) => [p.latitude, p.longitude]);
     const snapped = await snapRouteToRoads(latlngs);
-    L.polyline(snapped || latlngs, { color: "#3b82f6", weight: 4, dashArray: "6,6" }).addTo(liveRouteLayerGroup);
-
+    L.polyline(snapped || latlngs, { color: "#4ea1f7", weight: 4, dashArray: "6,6" }).addTo(liveRouteLayerGroup);
     const currentIcon = L.divIcon({
-      html: '<div class="pulse-dot"></div>', className: "", iconSize: [16, 16],
+      html: '<div style="width:16px;height:16px;border-radius:50%;background:#4ea1f7;border:3px solid white;box-shadow:0 0 0 rgba(78,161,247,0.6);"></div>',
+      className: "", iconSize: [16, 16],
     });
     const last = route[route.length - 1];
-    L.marker([last.latitude, last.longitude], { icon: currentIcon })
-      .addTo(liveRouteLayerGroup)
+    L.marker([last.latitude, last.longitude], { icon: currentIcon }).addTo(liveRouteLayerGroup)
       .bindPopup(`<b>Live position</b><br>Updated: ${new Date(last.timestamp).toLocaleTimeString()}<br>${last.latitude.toFixed(5)}, ${last.longitude.toFixed(5)}`);
-
-    setTimeout(() => {
-      map.invalidateSize();
-      map.setView([last.latitude, last.longitude], 13);
-    }, 150);
+    setTimeout(() => { map.invalidateSize(); map.setView([last.latitude, last.longitude], 13); }, 150);
   }
 
   function homeIcon(color) {
@@ -973,28 +1166,20 @@
     markers = {};
     users.forEach((u) => {
       if (u.lastLocation?.latitude && u.lastLocation?.longitude) {
-        const marker = L.marker([u.lastLocation.latitude, u.lastLocation.longitude])
-          .addTo(map)
+        const marker = L.marker([u.lastLocation.latitude, u.lastLocation.longitude]).addTo(map)
           .bindPopup(`<b>${u.name}</b><br>${u.employeeId}<br>${new Date(u.lastLocation.timestamp).toLocaleString()}<br>${u.lastLocation.latitude.toFixed(5)}, ${u.lastLocation.longitude.toFixed(5)}`);
         markers[u.employeeId] = marker;
       }
-
-      // Permanent Start/End Point (home base) markers - always shown,
-      // separate from the "last known location" pin above.
       const sp = u.startPoint;
       if (sp?.latitude != null && sp?.longitude != null) {
-        const spMarker = L.marker([sp.latitude, sp.longitude], { icon: homeIcon("#f59e0b") })
-          .addTo(map)
+        const spMarker = L.marker([sp.latitude, sp.longitude], { icon: homeIcon("#f59e0b") }).addTo(map)
           .bindPopup(`<b>🏠 ${u.name} - Start Point</b><br>${u.employeeId}<br>${sp.latitude.toFixed(5)}, ${sp.longitude.toFixed(5)}`);
         markers[`${u.employeeId}_start`] = spMarker;
       }
       const ep = u.endPoint;
       if (ep?.latitude != null && ep?.longitude != null) {
-        // If Start and End are the same coordinate, skip a duplicate pin
-        // sitting exactly on top of the Start marker.
         if (!sp || sp.latitude !== ep.latitude || sp.longitude !== ep.longitude) {
-          const epMarker = L.marker([ep.latitude, ep.longitude], { icon: homeIcon("#a855f7") })
-            .addTo(map)
+          const epMarker = L.marker([ep.latitude, ep.longitude], { icon: homeIcon("#a855f7") }).addTo(map)
             .bindPopup(`<b>🏠 ${u.name} - End Point</b><br>${u.employeeId}<br>${ep.latitude.toFixed(5)}, ${ep.longitude.toFixed(5)}`);
           markers[`${u.employeeId}_end`] = epMarker;
         }
@@ -1009,15 +1194,11 @@
     const ratePerKm = parseFloat(document.getElementById("newEmpRate").value) || 0;
     const password = document.getElementById("newEmpPassword").value;
 
-    if (!employeeId || !name || !password) {
-      alert("Please fill all fields");
-      return;
-    }
+    if (!employeeId || !name || !password) { showToast("Please fill all fields", "error"); return; }
 
     try {
       const res = await fetch(`${API_BASE}/api/auth/users`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ employeeId, name, password, ratePerKm, role }),
       });
       const data = await res.json();
@@ -1028,26 +1209,28 @@
       document.getElementById("newEmpRole").value = "employee";
       document.getElementById("newEmpRate").value = "";
       document.getElementById("newEmpPassword").value = "";
+      toggleAddForm();
+      showToast(`${name} added`, "success");
       await loadEmployees();
     } catch (err) {
-      alert(err.message);
+      showToast(err.message, "error");
     }
   }
 
-  async function removeEmployee(employeeId)   {
+  async function removeEmployee(employeeId) {
     if (!confirm(`Remove ${employeeId}? They will no longer be able to log in.`)) return;
     try {
-      const res = await fetch(`${API_BASE}/api/auth/users/${employeeId}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(`${API_BASE}/api/auth/users/${employeeId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to remove employee");
+      showToast("Employee removed", "success");
       await loadEmployees();
     } catch (err) {
-      alert(err.message);
+      showToast(err.message, "error");
     }
   }
+
+  document.getElementById("loginPassword").addEventListener("keydown", (e) => { if (e.key === "Enter") login(); });
 
   if (token) showDashboard();
   setInterval(() => { if (token) loadEmployees(); }, 30000);
