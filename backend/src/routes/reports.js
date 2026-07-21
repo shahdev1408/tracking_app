@@ -52,7 +52,7 @@ router.get("/daily/:employeeId", requireAuth, requireManager, async (req, res) =
     const pings = await Ping.find(filter).sort({ timestamp: 1 });
     const punches = await Punch.find(filter).sort({ timestamp: 1 });
 
-    const { days, totals } = buildDailySummary(pings, punches, ratePerKm);
+    const { days, totals } = buildDailySummary(pings, punches, ratePerKm, emp?.startPoint, emp?.endPoint);
     res.json({ employeeId, ratePerKm, days, totals });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -77,15 +77,34 @@ router.get("/export/:employeeId", requireAuth, requireManager, async (req, res) 
     const pings = await Ping.find(filter).sort({ timestamp: 1 });
     const punches = await Punch.find(filter).sort({ timestamp: 1 });
 
-    const { days, totals } = buildDailySummary(pings, punches, ratePerKm);
+    const { days, totals } = buildDailySummary(pings, punches, ratePerKm, emp?.startPoint, emp?.endPoint);
 
-    const header = "Date,Punch In,Punch Out,Manual Count,Auto Count,Total Km,Billable Km,Personal Km,Pay\n";
+    const csvField = (val) => `"${String(val ?? "").replace(/"/g, '""')}"`;
+
+    const header = [
+      "Date", "Punch In", "Punch In Device", "Punch Out", "Punch Out Device",
+      "Category", "Work Type", "Manual Count", "Auto Count",
+      "Total Km", "Billable Km", "Personal Km", "Pay",
+    ].join(",") + "\n";
+
     const rows = days.map((d) => {
+      const inPunch = d.manualPunches.find((p) => p.kind === "punch_in" || p.type === "in");
+      const outPunch = [...d.manualPunches].reverse().find((p) => p.kind === "punch_out" || p.type === "out");
       const inTime = d.punchInTime ? new Date(d.punchInTime).toLocaleTimeString() : "";
       const outTime = d.punchOutTime ? new Date(d.punchOutTime).toLocaleTimeString() : "";
-      return [d.date, inTime, outTime, d.punchCount, d.pingCount, d.totalKm, d.billableKm, d.personalKm, d.pay].join(",");
+      const inDevice = inPunch ? [inPunch.deviceName, inPunch.deviceId].filter(Boolean).join(" / ") : "";
+      const outDevice = outPunch ? [outPunch.deviceName, outPunch.deviceId].filter(Boolean).join(" / ") : "";
+      const category = inPunch?.punchCategory || "";
+      const workType = inPunch?.workType || "";
+
+      return [
+        d.date, inTime, csvField(inDevice), outTime, csvField(outDevice),
+        category, workType, d.punchCount, d.pingCount,
+        d.totalKm, d.billableKm, d.personalKm, d.pay,
+      ].join(",");
     }).join("\n");
-    const totalRow = `\nTOTAL,,,,,${totals.totalKm},${totals.billableKm},${totals.personalKm},${totals.pay}`;
+
+    const totalRow = `\nTOTAL,,,,,,,,,${totals.totalKm},${totals.billableKm},${totals.personalKm},${totals.pay}`;
 
     const csv = header + rows + totalRow;
     res.setHeader("Content-Type", "text/csv");
