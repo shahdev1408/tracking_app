@@ -5,7 +5,7 @@ function toDateKey(date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function buildDailySummary(pings, punches, ratePerKm = 0) {
+function buildDailySummary(pings, punches, ratePerKm = 0, startPoint = null, endPoint = null) {
   const dayMap = {};
 
   pings.forEach((p) => {
@@ -39,19 +39,71 @@ function buildDailySummary(pings, punches, ratePerKm = 0) {
       const punchIn = dayPunches.find((p) => p.type === "in");
       const punchOut = [...dayPunches].reverse().find((p) => p.type === "out");
 
-      const billablePings = dayPings.filter((p) => p.billable);
-      const personalPings = dayPings.filter((p) => !p.billable);
+      // Build one chronological route for the day out of pings + punches,
+      // so travel between punches counts too, not just between pings.
+      const mergedPoints = [
+        ...dayPings.map((p) => ({
+          latitude: p.latitude, longitude: p.longitude, timestamp: p.timestamp,
+          billable: p.billable, placeName: p.placeName || null,
+          deviceName: p.deviceName || null, deviceId: p.deviceId || null,
+          kind: "ping",
+        })),
+        ...dayPunches.map((p) => ({
+          latitude: p.latitude, longitude: p.longitude, timestamp: p.timestamp,
+          billable: p.billable, placeName: p.placeName || null,
+          deviceName: p.deviceName || null, deviceId: p.deviceId || null,
+          kind: p.type === "in" ? "punch_in" : "punch_out",
+        })),
+      ].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-      const billableKm = totalDistanceKm(billablePings);
-      const personalKm = totalDistanceKm(personalPings);
-      const totalKm = totalDistanceKm(dayPings);
+      // Prepend the manager-set Start Point (leaving-base leg) and append
+      // the End Point (returning-to-base leg), if configured for this user.
+      const hasStart = startPoint && typeof startPoint.latitude === "number" && typeof startPoint.longitude === "number";
+      const hasEnd = endPoint && typeof endPoint.latitude === "number" && typeof endPoint.longitude === "number";
+
+      const routeForDistance = [...mergedPoints];
+      if (hasStart && routeForDistance.length) {
+        routeForDistance.unshift({ latitude: startPoint.latitude, longitude: startPoint.longitude, billable: true, kind: "start_point" });
+      }
+      if (hasEnd && routeForDistance.length) {
+        routeForDistance.push({ latitude: endPoint.latitude, longitude: endPoint.longitude, billable: true, kind: "end_point" });
+      }
+
+      const billablePoints = routeForDistance.filter((p) => p.billable);
+      const personalPoints = routeForDistance.filter((p) => !p.billable);
+
+      const billableKm = totalDistanceKm(billablePoints);
+      const personalKm = totalDistanceKm(personalPoints);
+      const totalKm = totalDistanceKm(routeForDistance);
       const pay = Number((billableKm * ratePerKm).toFixed(2));
 
       let cumulativeKm = 0;
-      const routeWithDistance = dayPings.map((p, i) => {
+      const routeWithDistance = routeForDistance.map((p, i) => {
+        if (i > 0) {
+          const prev = routeForDistance[i - 1];
+          cumulativeKm += haversineKm(prev.latitude, prev.longitude, p.latitude, p.longitude);
+        }
+        return {
+          latitude: p.latitude,
+          longitude: p.longitude,
+          timestamp: p.timestamp || null,
+          billable: p.billable,
+          placeName: p.placeName || null,
+          cumulativeKm: Number(cumulativeKm.toFixed(2)),
+          deviceName: p.deviceName || null,
+          deviceId: p.deviceId || null,
+          kind: p.kind,
+        };
+      });
+
+      // autoPings is for the "Auto Track Points" list in the UI - real
+      // ping records only, separate from the merged route (which also
+      // includes punches and Start/End Point anchors for the map/km calc).
+      let pingCumulativeKm = 0;
+      const autoPingsWithDistance = dayPings.map((p, i) => {
         if (i > 0) {
           const prev = dayPings[i - 1];
-          cumulativeKm += haversineKm(prev.latitude, prev.longitude, p.latitude, p.longitude);
+          pingCumulativeKm += haversineKm(prev.latitude, prev.longitude, p.latitude, p.longitude);
         }
         return {
           _id: p._id,
@@ -60,7 +112,7 @@ function buildDailySummary(pings, punches, ratePerKm = 0) {
           timestamp: p.timestamp,
           billable: p.billable,
           placeName: p.placeName || null,
-          cumulativeKm: Number(cumulativeKm.toFixed(2)),
+          cumulativeKm: Number(pingCumulativeKm.toFixed(2)),
           deviceName: p.deviceName || null,
           deviceId: p.deviceId || null,
         };
@@ -93,7 +145,7 @@ function buildDailySummary(pings, punches, ratePerKm = 0) {
           deviceName: p.deviceName || null,
           deviceId: p.deviceId || null,
         })),
-        autoPings: routeWithDistance,
+        autoPings: autoPingsWithDistance,
         route: routeWithDistance,
       };
     });
