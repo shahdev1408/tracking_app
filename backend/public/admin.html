@@ -769,35 +769,12 @@
 
     const latlngs = day.route.map((p) => [p.latitude, p.longitude]);
 
+    // Try to snap to roads; fall back to straight line if it fails
+    const snapped = await snapRouteToRoads(latlngs);
+    L.polyline(snapped || latlngs, { color: "#3b82f6", weight: 4 }).addTo(routeLayerGroup);
+
     const first = day.route[0];
-    const last = day.route[day.route.length - 1];
     const isFirstAnchor = first.kind === "start_point";
-    const isLastAnchor = last.kind === "end_point";
-
-    // Split off the anchor legs (Start Point -> first real point, and
-    // last real point -> End Point) so they can be drawn differently -
-    // dashed yellow straight lines, since these are assumed/fixed
-    // distances, not actual GPS-tracked movement.
-    const realStartIdx = isFirstAnchor ? 1 : 0;
-    const realEndIdx = isLastAnchor ? latlngs.length - 2 : latlngs.length - 1;
-    const realRoute = latlngs.slice(realStartIdx, realEndIdx + 1);
-
-    if (isFirstAnchor && realRoute.length) {
-      L.polyline([latlngs[0], realRoute[0]], {
-        color: "#facc15", weight: 4, dashArray: "8,8",
-      }).addTo(routeLayerGroup).bindPopup("Assumed leg: Start Point → first activity");
-    }
-
-    if (realRoute.length > 1) {
-      const snapped = await snapRouteToRoads(realRoute);
-      L.polyline(snapped || realRoute, { color: "#3b82f6", weight: 4 }).addTo(routeLayerGroup);
-    }
-
-    if (isLastAnchor && realRoute.length) {
-      L.polyline([realRoute[realRoute.length - 1], latlngs[latlngs.length - 1]], {
-        color: "#facc15", weight: 4, dashArray: "8,8",
-      }).addTo(routeLayerGroup).bindPopup("Assumed leg: last activity → End Point");
-    }
 
     // Fixed Start Point anchors are drawn as an orange "base" marker so
     // they're visually distinct from a real recorded GPS point.
@@ -813,6 +790,9 @@
     L.marker(latlngs[0], { icon: startIcon }).addTo(routeLayerGroup).bindPopup(startLabel);
 
     if (latlngs.length > 1) {
+      const last = day.route[day.route.length - 1];
+      const isLastAnchor = last.kind === "end_point";
+
       const endIcon = L.divIcon({
         html: isLastAnchor
           ? '<div style="background:#f59e0b;width:20px;height:20px;border-radius:50%;border:3px solid white;display:flex;align-items:center;justify-content:center;font-size:11px;">🏠</div>'
