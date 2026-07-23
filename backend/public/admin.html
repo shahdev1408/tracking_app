@@ -401,6 +401,17 @@
   @media (max-width: 420px) {
     .login-box { padding: 26px 20px; }
   }
+  /* Floating add button for mobile view */
+  .fab-add {
+    display: none;
+    position: fixed; right: 16px; bottom: 22px; z-index: 20000;
+    width: 56px; height: 56px; border-radius: 28px; background: #22c55e; color: white;
+    border: none; box-shadow: 0 6px 18px rgba(0,0,0,0.4); font-size: 28px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  @media (max-width: 768px) {
+    .fab-add { display: flex; }
+  }
 </style>
 </head>
 <body>
@@ -464,6 +475,9 @@
     <div id="map"></div>
   </div>
 </div>
+
+<!-- Mobile floating add button -->
+<button id="fabAddEmployee" class="fab-add" title="Add employee" onclick="openAddOnMobile()">+</button>
 
 <!-- ================= DETAIL DRAWER ================= -->
 <div id="detailModal" class="drawer-overlay hidden" onclick="if(event.target===this) closeModal()">
@@ -639,6 +653,22 @@
       mapEl.classList.add("list-mode");
       label.textContent = "Map";
     }
+  }
+
+  // Show the employee list and open the Add form on small screens
+  function openAddOnMobile() {
+    mobileViewMode = 'list';
+    applyMobileView();
+    const form = document.getElementById('addForm');
+    form.classList.remove('hidden');
+    document.getElementById('addFormToggleLabel').textContent = 'Cancel';
+    // scroll the panel to bottom so the add form is visible
+    setTimeout(() => {
+      const panel = document.getElementById('employeePanel');
+      panel.scrollTop = panel.scrollHeight;
+      const idInput = document.getElementById('newEmpId');
+      if (idInput) idInput.focus();
+    }, 300);
   }
 
   // ---------- Add-employee accordion ----------
