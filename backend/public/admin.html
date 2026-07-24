@@ -806,6 +806,7 @@
           <button class="mini-btn ${liveTrackingEmployeeId === u.employeeId ? "live-on" : ""}" onclick="event.stopPropagation(); toggleLiveTracking('${u.employeeId}')">
             ${liveTrackingEmployeeId === u.employeeId ? "● Live" : "Track live"}
           </button>
+          <button class="mini-btn" onclick="event.stopPropagation(); showEmployeeOnMap('${u.employeeId}')">View on map</button>
           <button class="mini-btn danger" onclick="event.stopPropagation(); removeEmployee('${u.employeeId}')">Remove</button>
         </div>` : `<div class="emp-card-actions"><span class="mini-btn" style="cursor:default;">Manager</span></div>`;
 
@@ -1325,6 +1326,31 @@
         }
       }
     });
+  }
+
+  function showEmployeeOnMap(employeeId) {
+    const user = allUsers.find((u) => u.employeeId === employeeId);
+    if (!user) return;
+    const latlng = user.lastLocation?.latitude && user.lastLocation?.longitude
+      ? [user.lastLocation.latitude, user.lastLocation.longitude]
+      : null;
+    if (!latlng) {
+      showToast("No last known location available for this employee.", "error");
+      return;
+    }
+
+    if (window.innerWidth <= 768) { mobileViewMode = "map"; applyMobileView(); }
+    map.setView(latlng, 14, { animate: true });
+    if (markers[employeeId]) markers[employeeId].openPopup();
+
+    if (liveTrackingEmployeeId !== employeeId) {
+      stopLiveTracking();
+      liveTrackingEmployeeId = employeeId;
+      showLiveBanner(employeeId);
+      refreshLiveTrack();
+      liveTrackingInterval = setInterval(refreshLiveTrack, 10000);
+      loadEmployees();
+    }
   }
 
   async function addEmployee() {
