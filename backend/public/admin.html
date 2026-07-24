@@ -141,7 +141,7 @@
   .icon-btn:hover { background: var(--panel-3); border-color: var(--border); }
   .view-switch-btn { display: none; }
 
-  .layout { display: flex; flex: 1; min-height: 0; }
+  .layout { display: flex; flex: 1; min-height: 0; position: relative; }
 
   /* ---- Sidebar / roster ---- */
   #employeePanel {
@@ -221,6 +221,36 @@
   .leaflet-popup-tip { background: var(--panel-2); }
   .leaflet-popup-content { font-size: 12.5px; line-height: 1.5; }
   .leaflet-popup-content b { font-family: var(--font-display); }
+
+  /* Live tracking chrome on the map */
+  .live-banner {
+    position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 500;
+    background: var(--panel-2); border: 1px solid var(--live); color: var(--text);
+    padding: 8px 16px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
+    display: flex; align-items: center; gap: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  }
+  .live-banner .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--live); position: relative; flex-shrink: 0; }
+  .live-banner .dot::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--live); animation: dotPulse 1.6s ease-out infinite; }
+  .live-banner button {
+    background: none; border: none; color: var(--text-faint); cursor: pointer; font-size: 15px; padding: 0 0 0 6px; line-height: 1;
+  }
+  .live-banner button:hover { color: var(--text); }
+  .recenter-btn {
+    position: absolute; z-index: 500; right: 14px; bottom: 26px;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+    width: 40px; height: 40px; border-radius: 50%; cursor: pointer; font-size: 16px;
+    display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+  }
+  .recenter-btn:hover { border-color: var(--info); color: var(--info); }
+  .pulse-dot {
+    width: 16px; height: 16px; border-radius: 50%; background: var(--info);
+    border: 3px solid white; position: relative; box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  }
+  .pulse-dot::after {
+    content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 2px solid var(--info);
+    animation: livePulseRing 1.6s cubic-bezier(0.2,0.8,0.3,1) infinite;
+  }
+  @keyframes livePulseRing { 0% { transform: scale(0.6); opacity: 0.9; } 100% { transform: scale(2.4); opacity: 0; } }
 
   /* ================= DETAIL DRAWER ================= */
   .drawer-overlay {
@@ -364,17 +394,17 @@
   .toast.success::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--live); flex-shrink: 0; }
   .toast.error { border-color: var(--danger); }
   .toast.error::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--danger); flex-shrink: 0; }
+  .toast.info { border-color: var(--info); }
+  .toast.info::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--info); flex-shrink: 0; }
   @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
   /* ================= RESPONSIVE ================= */
-  /* Tablet */
   @media (max-width: 1024px) {
     #employeePanel { width: 300px; }
     .drawer { width: 420px; }
     .topbar-search { max-width: 220px; }
   }
 
-  /* Mobile */
   @media (max-width: 768px) {
     header.topbar { padding: 0 12px; gap: 10px; }
     .brand span.word { font-size: 14px; }
@@ -401,11 +431,11 @@
   @media (max-width: 420px) {
     .login-box { padding: 26px 20px; }
   }
-  /* Floating add button for mobile view */
+
   .fab-add {
     display: none;
     position: fixed; right: 16px; bottom: 22px; z-index: 20000;
-    width: 56px; height: 56px; border-radius: 28px; background: #22c55e; color: white;
+    width: 56px; height: 56px; border-radius: 28px; background: var(--signal); color: #1a0f04;
     border: none; box-shadow: 0 6px 18px rgba(0,0,0,0.4); font-size: 28px; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
   }
@@ -499,7 +529,6 @@
 
     <div class="drawer-body">
 
-      <!-- OVERVIEW TAB -->
       <div class="tab-panel active" id="tab-overview">
         <div class="stat-grid" id="detailStats"></div>
         <button class="btn-secondary" onclick="downloadReport(currentDetailEmployeeId)">
@@ -508,12 +537,10 @@
         </button>
       </div>
 
-      <!-- DAILY LOG TAB -->
       <div class="tab-panel" id="tab-daily">
         <div id="dailyList"></div>
       </div>
 
-      <!-- SETTINGS TAB -->
       <div class="tab-panel" id="tab-settings">
         <div class="field">
           <label>Full name</label>
@@ -623,6 +650,8 @@
   let liveTrackingEmployeeId = null;
   let liveTrackingInterval = null;
   let liveRouteLayerGroup = null;
+  let liveMarker = null;
+  let liveHasData = false;
 
   // ---------- Toasts ----------
   function showToast(message, type) {
@@ -655,14 +684,12 @@
     }
   }
 
-  // Show the employee list and open the Add form on small screens
   function openAddOnMobile() {
     mobileViewMode = 'list';
     applyMobileView();
     const form = document.getElementById('addForm');
     form.classList.remove('hidden');
     document.getElementById('addFormToggleLabel').textContent = 'Cancel';
-    // scroll the panel to bottom so the add form is visible
     setTimeout(() => {
       const panel = document.getElementById('employeePanel');
       panel.scrollTop = panel.scrollHeight;
@@ -671,7 +698,6 @@
     }, 300);
   }
 
-  // ---------- Add-employee accordion ----------
   function toggleAddForm() {
     const form = document.getElementById("addForm");
     const label = document.getElementById("addFormToggleLabel");
@@ -708,7 +734,6 @@
     document.getElementById("loginScreen").style.display = "flex";
   }
 
-  // ---------- Dashboard ----------
   async function showDashboard() {
     document.getElementById("loginScreen").style.display = "none";
     document.getElementById("dashboard").style.display = "flex";
@@ -818,13 +843,11 @@
     }
   }
 
-  // ---------- Tabs ----------
   function switchTab(tab) {
     document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
     document.querySelectorAll(".tab-panel").forEach(p => p.classList.toggle("active", p.id === `tab-${tab}`));
   }
 
-  // ---------- Detail drawer ----------
   async function openDetail(employeeId) {
     currentDetailEmployeeId = employeeId;
     document.getElementById("detailModal").classList.remove("hidden");
@@ -1023,10 +1046,6 @@
     const isFirstAnchor = first.kind === "start_point";
     const isLastAnchor = last.kind === "end_point";
 
-    // Try snapping the entire route (including any fixed anchors). If that
-    // succeeds we'll draw the snapped road-following polyline. Otherwise
-    // fall back to snapping only the inner activity points and drawing
-    // short assumed legs between anchors and first/last activity.
     const snappedFull = await snapRouteToRoads(latlngs);
     let drawnBounds = latlngs;
     if (snappedFull && snappedFull.length) {
@@ -1142,25 +1161,55 @@
     }
   }
 
-  // ---------- Live tracking ----------
+  // ================= LIVE TRACKING (rebuilt) =================
   function toggleLiveTracking(employeeId) {
     if (liveTrackingEmployeeId === employeeId) stopLiveTracking(); else startLiveTracking(employeeId);
   }
+
   function startLiveTracking(employeeId) {
     stopLiveTracking();
     liveTrackingEmployeeId = employeeId;
+    liveHasData = false;
     if (window.innerWidth <= 768) { mobileViewMode = "map"; applyMobileView(); }
+    showLiveBanner(employeeId);
+    showToast("Watching for the next signal from this employee…", "info");
     refreshLiveTrack();
-    liveTrackingInterval = setInterval(refreshLiveTrack, 20000);
+    liveTrackingInterval = setInterval(refreshLiveTrack, 10000);
     loadEmployees();
   }
+
   function stopLiveTracking() {
     if (liveTrackingInterval) clearInterval(liveTrackingInterval);
     liveTrackingInterval = null;
     liveTrackingEmployeeId = null;
+    liveHasData = false;
     if (liveRouteLayerGroup) { map.removeLayer(liveRouteLayerGroup); liveRouteLayerGroup = null; }
+    liveMarker = null;
+    hideLiveBanner();
+    const recenter = document.getElementById("recenterBtn");
+    if (recenter) recenter.remove();
     loadEmployees();
   }
+
+  function showLiveBanner(employeeId) {
+    hideLiveBanner();
+    const user = allUsers.find(u => u.employeeId === employeeId);
+    const banner = document.createElement("div");
+    banner.id = "liveBanner";
+    banner.className = "live-banner";
+    banner.innerHTML = `<span class="dot"></span><span id="liveBannerText">Waiting for signal from ${user ? user.name : employeeId}…</span><button onclick="stopLiveTracking()">✕</button>`;
+    document.getElementById("map").parentElement.style.position = "relative";
+    document.getElementById("map").parentElement.appendChild(banner);
+  }
+  function hideLiveBanner() {
+    const el = document.getElementById("liveBanner");
+    if (el) el.remove();
+  }
+  function updateLiveBannerText(text) {
+    const el = document.getElementById("liveBannerText");
+    if (el) el.textContent = text;
+  }
+
   async function refreshLiveTrack() {
     if (!liveTrackingEmployeeId) return;
     try {
@@ -1170,29 +1219,79 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to load live track");
       const todayData = data.days.find((d) => d.date === toLocalDateKey(today));
-      if (!todayData || !todayData.route.length) return;
+      if (!todayData || !todayData.route.length) {
+        updateLiveBannerText("Waiting for the first signal today…");
+        return;
+      }
+      liveHasData = true;
       drawLiveRoute(todayData.route);
     } catch (err) {
       console.log("Live tracking refresh failed:", err.message);
+      updateLiveBannerText("Connection issue — retrying…");
     }
   }
+
   function toLocalDateKey(date) {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
   }
+
+  // Smoothly tweens the live marker from its current position to the new
+  // one over ~900ms, instead of teleporting - this is what makes it read
+  // as "moving" rather than just jumping between polling snapshots.
+  function animateMarkerTo(marker, fromLatLng, toLatLng, duration) {
+    const start = performance.now();
+    function step(now) {
+      const t = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      const lat = fromLatLng.lat + (toLatLng.lat - fromLatLng.lat) * eased;
+      const lng = fromLatLng.lng + (toLatLng.lng - fromLatLng.lng) * eased;
+      marker.setLatLng([lat, lng]);
+      if (t < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  function ensureRecenterButton(lastLatLng) {
+    let btn = document.getElementById("recenterBtn");
+    if (!btn) {
+      btn = document.createElement("button");
+      btn.id = "recenterBtn";
+      btn.className = "recenter-btn";
+      btn.title = "Recenter on employee";
+      btn.innerHTML = "⌖";
+      document.getElementById("map").parentElement.appendChild(btn);
+    }
+    btn.onclick = () => map.setView(lastLatLng, Math.max(map.getZoom(), 14), { animate: true });
+  }
+
   async function drawLiveRoute(route) {
-    if (liveRouteLayerGroup) map.removeLayer(liveRouteLayerGroup);
-    liveRouteLayerGroup = L.layerGroup().addTo(map);
     const latlngs = route.map((p) => [p.latitude, p.longitude]);
-    const snapped = await snapRouteToRoads(latlngs);
-    L.polyline(snapped || latlngs, { color: "#4ea1f7", weight: 4, dashArray: "6,6" }).addTo(liveRouteLayerGroup);
-    const currentIcon = L.divIcon({
-      html: '<div style="width:16px;height:16px;border-radius:50%;background:#4ea1f7;border:3px solid white;box-shadow:0 0 0 rgba(78,161,247,0.6);"></div>',
-      className: "", iconSize: [16, 16],
-    });
     const last = route[route.length - 1];
-    L.marker([last.latitude, last.longitude], { icon: currentIcon }).addTo(liveRouteLayerGroup)
-      .bindPopup(`<b>Live position</b><br>Updated: ${new Date(last.timestamp).toLocaleTimeString()}<br>${last.latitude.toFixed(5)}, ${last.longitude.toFixed(5)}`);
-    setTimeout(() => { map.invalidateSize(); map.setView([last.latitude, last.longitude], 13); }, 150);
+    const lastLatLng = L.latLng(last.latitude, last.longitude);
+
+    if (!liveRouteLayerGroup) liveRouteLayerGroup = L.layerGroup().addTo(map);
+
+    // Redraw the trail behind the current position each refresh.
+    liveRouteLayerGroup.clearLayers();
+    const snapped = await snapRouteToRoads(latlngs);
+    L.polyline(snapped || latlngs, { color: "#4ea1f7", weight: 4, opacity: 0.55, dashArray: "1,8", lineCap: "round" }).addTo(liveRouteLayerGroup);
+
+    if (!liveMarker) {
+      const icon = L.divIcon({ html: '<div class="pulse-dot"></div>', className: "", iconSize: [16, 16] });
+      liveMarker = L.marker(lastLatLng, { icon }).addTo(liveRouteLayerGroup);
+      map.setView(lastLatLng, 14);
+    } else {
+      const from = liveMarker.getLatLng();
+      liveRouteLayerGroup.addLayer(liveMarker);
+      if (from.lat !== lastLatLng.lat || from.lng !== lastLatLng.lng) {
+        animateMarkerTo(liveMarker, from, lastLatLng, 900);
+      }
+    }
+    liveMarker.bindPopup(`<b>Live position</b><br>Updated: ${new Date(last.timestamp).toLocaleTimeString()}<br>${last.latitude.toFixed(5)}, ${last.longitude.toFixed(5)}`);
+
+    updateLiveBannerText(`Live · updated ${new Date(last.timestamp).toLocaleTimeString()}`);
+    ensureRecenterButton(lastLatLng);
+    map.invalidateSize();
   }
 
   function homeIcon(color) {
