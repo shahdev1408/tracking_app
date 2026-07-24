@@ -9,7 +9,7 @@ const { reverseGeocode } = require("../utils/geocode");
 router.post("/ping", requireAuth, async (req, res) => {
   try {
     const employeeId = req.user.employeeId;
-    const { latitude, longitude, timestamp, deviceName, deviceId } = req.body;
+    const { latitude, longitude, timestamp, deviceName, deviceId, backgroundPermission } = req.body;
 
     if (latitude == null || longitude == null) {
       return res.status(400).json({ error: "latitude, longitude are required" });
@@ -29,13 +29,13 @@ router.post("/ping", requireAuth, async (req, res) => {
       isSunday, isOfficeHours, billable, placeName, deviceName, deviceId,
     });
 
-    await User.updateOne(
-      { employeeId },
-      {
-        lastLocation: { latitude, longitude, timestamp: ts, placeName },
-        lastDevice: { deviceName, deviceId, timestamp: ts },
-      }
-    );
+    const updateObj = {
+      lastLocation: { latitude, longitude, timestamp: ts, placeName },
+      lastDevice: { deviceName, deviceId, timestamp: ts },
+    };
+    if (typeof backgroundPermission === 'boolean') updateObj.backgroundPermission = backgroundPermission;
+
+    await User.updateOne({ employeeId }, { $set: updateObj });
 
     res.status(201).json({ message: "Ping recorded", ping });
   } catch (err) {

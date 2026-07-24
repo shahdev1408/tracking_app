@@ -35,6 +35,8 @@ const userSchema = new mongoose.Schema({
     deviceId: String,
     timestamp: Date,
   },
+  backgroundPermission: { type: Boolean, default: null },
+  lastPermissionReminderAt: { type: Date, default: null },
 
   // Auto-tracking schedule (set by manager) - lets background tracking run
   // on a fixed weekly schedule instead of only between manual Punch In/Out.

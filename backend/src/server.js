@@ -9,6 +9,7 @@ const trackingRoutes = require("./routes/tracking");
 const reportRoutes = require("./routes/reports");
 const authRoutes = require("./routes/auth");
 const appVersionRoutes = require("./routes/appVersion");
+const notificationsRoutes = require("./routes/notifications");
 
 const app = express();
 app.use(cors());
@@ -25,6 +26,7 @@ app.use("/api/punch", punchRoutes);
 app.use("/api/tracking", trackingRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/app-version", appVersionRoutes);
+app.use("/api/notifications", notificationsRoutes);
 
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI || "mongodb://localhost:27017/tracking-app";

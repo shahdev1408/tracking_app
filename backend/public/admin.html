@@ -797,18 +797,26 @@
         ? `${u.lastDevice.deviceName || "unknown"}${u.lastDevice.deviceId ? " · " + u.lastDevice.deviceId : ""}`
         : "No login recorded";
 
+      // Background permission status (boolean expected as u.backgroundPermission)
+      const bgStatus = (u.backgroundPermission === true)
+        ? `<span style="color:var(--live); font-weight:700;">Background OK</span>`
+        : (u.backgroundPermission === false)
+          ? `<span style="color:var(--danger); font-weight:700;">Needs permission</span>`
+          : `<span class="dim">Background: Unknown</span>`;
+
       const actionsHtml = u.role !== "manager" ? `
-        <div class="emp-card-actions">
-          <label class="chip-toggle" onclick="event.stopPropagation()">
-            <input type="checkbox" ${u.active ? "checked" : ""} onchange="toggleActive('${u.employeeId}', this.checked)">
-            <span class="chip-slider"></span>
-          </label>
-          <button class="mini-btn ${liveTrackingEmployeeId === u.employeeId ? "live-on" : ""}" onclick="event.stopPropagation(); toggleLiveTracking('${u.employeeId}')">
-            ${liveTrackingEmployeeId === u.employeeId ? "● Live" : "Track live"}
-          </button>
-          <button class="mini-btn" onclick="event.stopPropagation(); showEmployeeOnMap('${u.employeeId}')">View on map</button>
-          <button class="mini-btn danger" onclick="event.stopPropagation(); removeEmployee('${u.employeeId}')">Remove</button>
-        </div>` : `<div class="emp-card-actions"><span class="mini-btn" style="cursor:default;">Manager</span></div>`;
+          <div class="emp-card-actions">
+            <label class="chip-toggle" onclick="event.stopPropagation()">
+              <input type="checkbox" ${u.active ? "checked" : ""} onchange="toggleActive('${u.employeeId}', this.checked)">
+              <span class="chip-slider"></span>
+            </label>
+            <button class="mini-btn ${liveTrackingEmployeeId === u.employeeId ? "live-on" : ""}" onclick="event.stopPropagation(); toggleLiveTracking('${u.employeeId}')">
+              ${liveTrackingEmployeeId === u.employeeId ? "● Live" : "Track live"}
+            </button>
+            <button class="mini-btn" onclick="event.stopPropagation(); showEmployeeOnMap('${u.employeeId}')">View on map</button>
+            <button class="mini-btn" onclick="event.stopPropagation(); sendPermissionReminder('${u.employeeId}')">Remind</button>
+            <button class="mini-btn danger" onclick="event.stopPropagation(); removeEmployee('${u.employeeId}')">Remove</button>
+          </div>` : `<div class="emp-card-actions"><span class="mini-btn" style="cursor:default;">Manager</span></div>`;
 
       card.innerHTML = `
         <div class="emp-card-top" onclick="openDetail('${u.employeeId}')">
@@ -821,6 +829,7 @@
         <div class="emp-card-meta" onclick="openDetail('${u.employeeId}')">
           <span>Last seen <span class="dim">${lastSeen}</span></span>
           <span>Device <span class="dim">${loginDevice}</span></span>
+          <span>${bgStatus}</span>
         </div>
         ${actionsHtml}
       `;
@@ -841,6 +850,21 @@
     } catch (err) {
       showToast(err.message, "error");
       await loadEmployees();
+    }
+  }
+
+  // Send a permission reminder (backend should implement sending push/notification)
+  async function sendPermissionReminder(employeeId) {
+    try {
+      const res = await fetch(`${API_BASE}/api/notifications/permission-reminder/${employeeId}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to send reminder");
+      showToast("Permission reminder sent", "success");
+    } catch (err) {
+      showToast(err.message || "Could not send reminder", "error");
     }
   }
 
@@ -896,11 +920,14 @@
       const dailyData = await dailyRes.json();
       if (!dailyRes.ok) throw new Error(dailyData.error || "Failed to load daily summary");
 
+      const permText = emp.backgroundPermission === true ? 'Allowed' : (emp.backgroundPermission === false ? 'Needs permission' : 'Unknown');
+      const permColor = emp.backgroundPermission === true ? 'var(--live)' : (emp.backgroundPermission === false ? 'var(--danger)' : '');
       document.getElementById("detailStats").innerHTML = `
         <div class="stat-card"><div class="label">Rate</div><div class="value">₹${dailyData.ratePerKm}/km</div></div>
         <div class="stat-card accent"><div class="label">Pay due</div><div class="value">₹${dailyData.totals.pay}</div></div>
         <div class="stat-card"><div class="label">Billable km</div><div class="value">${dailyData.totals.billableKm}</div></div>
         <div class="stat-card"><div class="label">Personal km</div><div class="value">${dailyData.totals.personalKm}</div></div>
+        <div class="stat-card wide"><div class="label">Background</div><div class="value" style="color:${permColor};">${permText}</div></div>
       `;
 
       renderDailySummary(dailyData.days);
