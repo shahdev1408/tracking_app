@@ -43,6 +43,23 @@ router.post("/ping", requireAuth, async (req, res) => {
   }
 });
 
+router.get("/latest/:employeeId", requireAuth, requireManager, async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+    const user = await User.findOne({ employeeId }).select("employeeId lastLocation lastDevice backgroundPermission");
+    if (!user) return res.status(404).json({ error: "Employee not found" });
+
+    res.json({
+      employeeId: user.employeeId,
+      lastLocation: user.lastLocation || null,
+      lastDevice: user.lastDevice || null,
+      backgroundPermission: user.backgroundPermission,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get("/status/:employeeId", requireAuth, requireManager, async (req, res) => {
   try {
     const { employeeId } = req.params;
