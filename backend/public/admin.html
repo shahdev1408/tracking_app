@@ -935,9 +935,9 @@
         <div class="stat-card accent"><div class="label">Pay due</div><div class="value">₹${dailyData.totals.pay}</div></div>
         <div class="stat-card"><div class="label">Billable km</div><div class="value">${dailyData.totals.billableKm}</div></div>
         <div class="stat-card"><div class="label">Personal km</div><div class="value">${dailyData.totals.personalKm}</div></div>
-        <div class="stat-card"><div class="label">Last ping</div><div class="value">${lastPingText}</div></div>
-        <div class="stat-card"><div class="label">Ping age</div><div class="value">${lastPingAge}</div></div>
-        <div class="stat-card"><div class="label">Ping status</div><div class="value" style="color:${pingColor};">${pingStatus}</div></div>
+        <div class="stat-card"><div class="label">Last ping</div><div class="value" id="detailLastPing">${lastPingText}</div></div>
+        <div class="stat-card"><div class="label">Ping age</div><div class="value" id="detailPingAge">${lastPingAge}</div></div>
+        <div class="stat-card"><div class="label">Ping status</div><div class="value" id="detailPingStatus" style="color:${pingColor};">${pingStatus}</div></div>
         <div class="stat-card wide"><div class="label">Background</div><div class="value" style="color:${permColor};">${permText}</div></div>
       `;
 
@@ -1253,6 +1253,21 @@
     if (el) el.textContent = text;
   }
 
+  function updateLiveDetailPanel(loc) {
+    if (!currentDetailEmployeeId || currentDetailEmployeeId !== liveTrackingEmployeeId) return;
+    const lastPingText = new Date(loc.timestamp).toLocaleString();
+    const ageMinutes = Math.floor((Date.now() - new Date(loc.timestamp).getTime()) / 60000);
+    const lastPingEl = document.getElementById("detailLastPing");
+    const pingAgeEl = document.getElementById("detailPingAge");
+    const pingStatusEl = document.getElementById("detailPingStatus");
+    if (lastPingEl) lastPingEl.textContent = lastPingText;
+    if (pingAgeEl) pingAgeEl.textContent = `${ageMinutes}m ago`;
+    if (pingStatusEl) {
+      pingStatusEl.textContent = ageMinutes > 15 ? "Stale" : "Fresh";
+      pingStatusEl.style.color = ageMinutes > 15 ? "var(--danger)" : "var(--live)";
+    }
+  }
+
   async function refreshLiveTrack() {
     if (!liveTrackingEmployeeId) return;
     try {
@@ -1291,6 +1306,7 @@
 
       liveMarker.bindPopup(`<b>Live position</b><br>Updated: ${new Date(loc.timestamp).toLocaleTimeString()}<br>${loc.latitude.toFixed(5)}, ${loc.longitude.toFixed(5)}`);
       updateLiveBannerText(`Live · updated ${new Date(loc.timestamp).toLocaleTimeString()}`);
+      updateLiveDetailPanel(loc);
       ensureRecenterButton(lastLatLng);
       map.invalidateSize();
     } catch (err) {
