@@ -149,9 +149,16 @@ router.put("/users/:employeeId/schedule", requireAuth, requireManager, async (re
       days: Array.isArray(days) ? days : existing.autoSchedule?.days ?? [],
       startTime: startTime || existing.autoSchedule?.startTime || "08:00",
       endTime: endTime || existing.autoSchedule?.endTime || "20:00",
-      intervalMinutes: typeof intervalMinutes === "number" && intervalMinutes > 0
+      // Android OS enforces a hard ~15 min minimum between background
+      // wake-ups. Enforce it server-side so direct API calls can't set an
+      // interval below 15 (the RN background tracker already relies on
+      // >= 15 for the schedule-based auto track). Existing values below 15
+      // are bumped up to 15 to keep behavior consistent.
+      intervalMinutes: typeof intervalMinutes === "number" && intervalMinutes >= 15
         ? intervalMinutes
-        : existing.autoSchedule?.intervalMinutes ?? 30,
+        : (existing.autoSchedule?.intervalMinutes ?? 30) >= 15
+          ? existing.autoSchedule?.intervalMinutes ?? 30
+          : 15,
     };
 
     const user = await User.findOneAndUpdate(

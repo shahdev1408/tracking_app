@@ -1,0 +1,6 @@
+Flask>=2.0
+pillow
+pytesseract
+opencv-python-headless
+numpy
+werkzeug

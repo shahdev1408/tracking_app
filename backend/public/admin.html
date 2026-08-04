@@ -196,6 +196,17 @@
   .mini-btn:hover { background: var(--panel-3); color: var(--text); }
   .mini-btn.live-on { background: var(--signal-soft); border-color: var(--signal); color: var(--signal); }
   .mini-btn.danger:hover { background: var(--danger-soft); border-color: var(--danger); color: var(--danger); }
+  .transport-tag, .photo-type-tag {
+    display: inline-block;
+    margin-top: 6px;
+    margin-right: 6px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    letter-spacing: 0.02em;
+  }
+  .transport-tag { background: rgba(56, 189, 248, 0.16); color: #7dd3fc; }
+  .photo-type-tag { background: rgba(236, 72, 153, 0.14); color: #f9a8d4; }
 
   .empty-state { text-align: center; padding: 40px 16px; color: var(--text-faint); font-size: 13px; }
 
@@ -598,9 +609,8 @@
           </div>
           <div class="settings-row" style="margin-top:12px;">
             <label style="min-width:70px;">Every</label>
-            <input list="scheduleIntervalOptions" id="scheduleInterval" class="coord-input" type="number" min="1" step="1" placeholder="minutes" style="max-width:110px; flex:none;" />
+            <input list="scheduleIntervalOptions" id="scheduleInterval" class="coord-input" type="number" min="15" step="1" placeholder="30" style="max-width:110px; flex:none;" />
             <datalist id="scheduleIntervalOptions">
-              <option value="5">5 min</option>
               <option value="15">15 min</option>
               <option value="30">30 min</option>
               <option value="60">1 hour</option>
@@ -608,6 +618,9 @@
               <option value="180">3 hours</option>
             </datalist>
             <span style="font-size:12px; color:var(--text-faint);">minutes</span>
+          </div>
+          <div style="margin-top:6px; padding:8px 10px; background:var(--panel-3); border:1px solid var(--border-soft); border-radius:7px; font-size:11px; color:var(--text-faint); line-height:1.5;">
+            ⓘ Minimum is <b style="color:var(--info);">15 minutes</b> (Android OS limit for background tracking). Values below 15 are ignored when the app is closed. When the app is open, the phone still pings every ~300 m / 10 min for a smooth route.
           </div>
           <div class="settings-row" style="margin-top:12px;">
             <label class="chip-toggle">
@@ -656,6 +669,17 @@
   let liveMarker = null;
   let liveHasData = false;
   let livePollingUsersInterval = null;
+  let punchOcrData = {};
+
+  function escapeHtml(str) {
+    if (str === null || str === undefined) return "";
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
 
   // ---------- Toasts ----------
   function showToast(message, type) {
@@ -808,6 +832,10 @@
           ? `<span style="color:var(--danger); font-weight:700;">Background: Needs permission</span>`
           : `<span class="dim">Background: Unknown</span>`;
 
+      const ocrStatus = u.lastOcr?.text
+        ? `<span style="color:var(--live); font-weight:700;">✅ OCR</span>`
+        : `<span style="color:var(--warning); font-weight:700;">⌛ OCR</span>`;
+
       const actionsHtml = u.role !== "manager" ? `
           <div class="emp-card-actions">
             <label class="chip-toggle" onclick="event.stopPropagation()">
@@ -834,6 +862,7 @@
           <span>Last seen <span class="dim">${lastSeen}</span></span>
           <span>Device <span class="dim">${loginDevice}</span></span>
           <span>${bgStatus}</span>
+          <span>${ocrStatus}</span>
         </div>
         ${actionsHtml}
       `;
@@ -938,6 +967,8 @@
         <div class="stat-card"><div class="label">Last ping</div><div class="value" id="detailLastPing">${lastPingText}</div></div>
         <div class="stat-card"><div class="label">Ping age</div><div class="value" id="detailPingAge">${lastPingAge}</div></div>
         <div class="stat-card"><div class="label">Ping status</div><div class="value" id="detailPingStatus" style="color:${pingColor};">${pingStatus}</div></div>
+        <div class="stat-card"><div class="label">Last OCR</div><div class="value">${emp.lastOcr?.text ? escapeHtml(emp.lastOcr.text) : 'No OCR yet'}</div></div>
+        <div class="stat-card"><div class="label">OCR confidence</div><div class="value">${emp.lastOcr?.confidence != null ? `${emp.lastOcr.confidence}%` : '—'}</div></div>
         <div class="stat-card wide"><div class="label">Background</div><div class="value" style="color:${permColor};">${permText}</div></div>
       `;
 
@@ -962,6 +993,19 @@
     }
   }
 
+  function formatTransportMode(mode) {
+    switch (mode) {
+      case "personal_vehicle": return "Personal Vehicle";
+      case "public_transport": return "Public Transport";
+      case "office_vehicle": return "Office Vehicle";
+      default: return "Unknown";
+    }
+  }
+
+  function formatPhotoType(type) {
+    return type === "start" ? "Start" : type === "end" ? "End" : "";
+  }
+
   function renderDailySummary(days) {
     lastLoadedDays = days;
     const list = document.getElementById("dailyList");
@@ -977,21 +1021,26 @@
       const row = document.createElement("div");
       row.className = "day-block";
 
-      const manualHtml = d.manualPunches.map((p) => `
+      const manualHtml = d.manualPunches.map((p) => {
+        punchOcrData[p._id] = p.ocrResult || null;
+        return `
         <div class="point-row">
           <div class="point-row-top">
             <div>
-              <b>${p.type === "in" ? "PUNCH IN" : "PUNCH OUT"}</b> · ${new Date(p.timestamp).toLocaleTimeString()}
+              <b>${p.type === "in" ? "START" : "END"}</b> · ${new Date(p.timestamp).toLocaleTimeString()}
+              ${p.transportMode ? `<div><span class="transport-tag">${formatTransportMode(p.transportMode)}</span>${p.photoType ? `<span class="photo-type-tag">${formatPhotoType(p.photoType)}</span>` : ""}</div>` : ""}
               ${p.punchCategory ? `<div><span class="cat-tag ${p.punchCategory}">${p.punchCategory}${p.workType ? " · " + p.workType : ""}</span></div>` : ""}
               <div class="mono" style="margin-top:5px;">${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)}</div>
               ${p.placeName ? `<span class="place">${p.placeName}</span>` : ""}
               ${(p.deviceName || p.deviceId) ? `<span class="device-tag">${p.deviceName || "unknown"} ${p.deviceId ? "· " + p.deviceId : ""}</span>` : ""}
               ${p.photoBase64 ? `<img class="punch-photo" src="${p.photoBase64}" onclick="showPhoto('${p.photoBase64}')" />` : ""}
+              ${p.ocrResult?.text ? `<div style="margin-top:8px;"><strong>OCR:</strong> ${escapeHtml(p.ocrResult.text)} ${p.ocrResult.confidence != null ? `(conf ${p.ocrResult.confidence})` : ""} <button class="mini-btn" onclick="event.stopPropagation(); editPunchOcr('${p._id}')">Edit OCR</button></div>` : `<div style="margin-top:8px;"><button class="mini-btn" onclick="event.stopPropagation(); editPunchOcr('${p._id}')">Add OCR</button></div>`}
             </div>
             <button class="btn-delete-point" onclick="deleteRecord('punch', '${p._id}')">✕</button>
           </div>
         </div>
-      `).join("");
+      `;
+      }).join("");
 
       const autoHtml = d.autoPings.map((p) => `
         <div class="point-row">
@@ -1035,6 +1084,31 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to delete record");
       showToast("Record deleted", "success");
+      if (currentDetailEmployeeId) await openDetail(currentDetailEmployeeId);
+    } catch (err) {
+      showToast(err.message, "error");
+    }
+  }
+
+  async function editPunchOcr(punchId) {
+    const current = punchOcrData[punchId] || {};
+    const newText = window.prompt("Edit OCR reading", current.text || "");
+    if (newText === null) return;
+    await savePunchOcr(punchId, newText.trim(), current.confidence);
+  }
+
+  async function savePunchOcr(punchId, text, confidence) {
+    try {
+      const body = { text: text || null };
+      if (typeof confidence === 'number') body.confidence = confidence;
+      const res = await fetch(`${API_BASE}/api/punch/ocr/${punchId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to save OCR result");
+      showToast("OCR result saved", "success");
       if (currentDetailEmployeeId) await openDetail(currentDetailEmployeeId);
     } catch (err) {
       showToast(err.message, "error");
@@ -1171,6 +1245,11 @@
       const intervalMinutes = parseInt(document.getElementById("scheduleInterval").value, 10) || 30;
       const enabled = document.getElementById("scheduleEnabled").checked;
 
+      if (enabled && intervalMinutes < 15) {
+        showToast("Auto-tracking interval must be at least 15 minutes (Android OS limit).", "error");
+        return;
+      }
+
       const schedRes = await fetch(`${API_BASE}/api/auth/users/${currentDetailEmployeeId}/schedule`, {
         method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ enabled, days, startTime, endTime, intervalMinutes }),
@@ -1213,7 +1292,11 @@
     showLiveBanner(employeeId);
     showToast("Watching for the next signal from this employee…", "info");
     refreshLiveTrack();
-    liveTrackingInterval = setInterval(refreshLiveTrack, 10000);
+    // Poll fast (3s) so the live marker updates near-real-time while an
+    // employee's app is open (their foreground pings fire every ~50m / 60s).
+    // Background-only pings are ~15 min apart, so in that case the marker
+    // simply updates on each arrival.
+    liveTrackingInterval = setInterval(refreshLiveTrack, 3000);
     // While watching live, poll the roster more frequently so markers and status update quickly
     if (livePollingUsersInterval) clearInterval(livePollingUsersInterval);
     livePollingUsersInterval = setInterval(loadEmployees, 10000);
@@ -1431,7 +1514,7 @@
       liveTrackingEmployeeId = employeeId;
       showLiveBanner(employeeId);
       refreshLiveTrack();
-      liveTrackingInterval = setInterval(refreshLiveTrack, 10000);
+      liveTrackingInterval = setInterval(refreshLiveTrack, 3000);
       if (livePollingUsersInterval) clearInterval(livePollingUsersInterval);
       livePollingUsersInterval = setInterval(loadEmployees, 10000);
       loadEmployees();

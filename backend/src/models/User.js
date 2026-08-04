@@ -35,6 +35,12 @@ const userSchema = new mongoose.Schema({
     deviceId: String,
     timestamp: Date,
   },
+  lastOcr: {
+    text: { type: String, default: null },
+    confidence: { type: Number, default: null },
+    punchId: { type: String, default: null },
+    processedAt: { type: Date, default: null },
+  },
   backgroundPermission: { type: Boolean, default: null },
   lastPermissionReminderAt: { type: Date, default: null },
 

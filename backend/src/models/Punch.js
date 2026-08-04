@@ -16,9 +16,20 @@ const punchSchema = new mongoose.Schema({
   // New fields:
   punchCategory: { type: String, enum: ["personal", "project"], default: "project" },
   workType: { type: String, enum: ["site_work", "office_work", "meeting", "tour", null], default: null },
+  transportMode: { type: String, enum: ["personal_vehicle", "public_transport", "office_vehicle"] },
+  photoType: { type: String, enum: ["start", "end"] },
   photoBase64: { type: String }, // captured photo, stored as base64 data URL
   deviceName: { type: String },  // e.g. "Samsung Galaxy M31"
   deviceId: { type: String },    // Android ID (not true IMEI - Android blocks that since Android 10)
+  odometerReading: { type: Number },
+  ticketAmount: { type: Number },
+  ticketDate: { type: Date },
+  ocrResult: {
+    text: { type: String, default: null },
+    confidence: { type: Number, default: null },
+    filename: { type: String, default: null },
+    processedAt: { type: Date, default: null },
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model("Punch", punchSchema);
