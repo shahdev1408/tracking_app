@@ -4,6 +4,9 @@ import ManualPunchScreen from "./ManualPunchScreen";
 import AutoTrackScreen from "./AutoTrackScreen";
 import { initBackgroundFetch, stopBackgroundFetch } from "../services/backgroundTracker";
 import { getStoredPunchStatus } from "../services/api";
+import NetInfo from "@react-native-community/netinfo";
+import { useLanguage, LANGUAGE_OPTIONS } from "../utils/language";
+import { uploadQueuedPunches } from "../services/api";
 
 // Auto Track is no longer a visible tab - employees should not see or know
 // it exists as a separate feature. It still runs exactly the same way:
@@ -12,13 +15,22 @@ import { getStoredPunchStatus } from "../services/api";
 export default function HomeScreen({ user, onLogout }) {
   const [isPunchedIn, setIsPunchedIn] = useState(false);
   const [needsLocationPrompt, setNeedsLocationPrompt] = useState(false);
+  const { language, setLanguage, t } = useLanguage();
 
   useEffect(() => {
     restorePunchStatus();
-    initBackgroundFetch(user);
+    uploadQueuedPunches().catch(console.log);
     checkLocationPermission();
-    return () => stopBackgroundFetch();
-  }, []);
+    if (user) initBackgroundFetch(user);
+ 
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      if (state.isConnected) {
+        uploadQueuedPunches().catch(console.log);
+      }
+    });
+ 
+    return () => unsubscribe();
+  }, [user]);
 
   async function restorePunchStatus() {
     try {
@@ -31,7 +43,6 @@ export default function HomeScreen({ user, onLogout }) {
 
   async function checkLocationPermission() {
     if (Platform.OS !== "android") return;
-    if (!user?.autoSchedule?.enabled) return;
 
     try {
       const granted = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.ACCESS_BACKGROUND_LOCATION);
@@ -48,20 +59,20 @@ export default function HomeScreen({ user, onLogout }) {
       const granted = await PermissionsAndroid.request(
         PermissionsAndroid.PERMISSIONS.ACCESS_BACKGROUND_LOCATION,
         {
-          title: "Allow location access",
-          message: "This app needs location permission to work correctly. Please allow location access.",
-          buttonPositive: "Allow",
-          buttonNegative: "Cancel",
+          title: t('allowLocation'),
+          message: t('backgroundPermissionNeeded'),
+          buttonPositive: t('allow'),
+          buttonNegative: t('cancel'),
         }
       );
 
       if (granted === PermissionsAndroid.RESULTS.GRANTED) {
         setNeedsLocationPrompt(false);
-        Alert.alert("Location enabled", "Location permission is now allowed.");
+        Alert.alert(t('locationEnabled'), t('locationEnabledMessage'));
       } else {
         Alert.alert(
-          "Permission needed",
-          "Location permission is required for this app to work correctly. Please tap Enable again or use Settings.",
+          t('permissionNeededTitle'),
+          t('pleaseEnableFromSettings'),
         );
       }
     } catch (err) {
@@ -71,7 +82,7 @@ export default function HomeScreen({ user, onLogout }) {
 
   function openLocationSettings() {
     Linking.openSettings().catch(() => {
-      Alert.alert("Unable to open settings", "Please enable location permission from your device settings.");
+      Alert.alert(t('unableToOpenSettings'), t('pleaseEnableFromSettings'));
     });
   }
 
@@ -83,13 +94,13 @@ export default function HomeScreen({ user, onLogout }) {
     <View style={{ flex: 1, backgroundColor: "#0f172a" }}>
       {needsLocationPrompt && (
         <View style={styles.permissionBanner}>
-          <Text style={styles.bannerText}>Location permission is needed for this app.</Text>
+          <Text style={styles.bannerText}>{t('locationPermissionBanner')}</Text>
           <View style={styles.bannerActions}>
             <TouchableOpacity style={styles.bannerButton} onPress={requestLocationPermission}>
-              <Text style={styles.bannerButtonText}>Enable</Text>
+              <Text style={styles.bannerButtonText}>{t('enableLocation')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.bannerLink} onPress={openLocationSettings}>
-              <Text style={styles.bannerLinkText}>Settings</Text>
+              <Text style={styles.bannerLinkText}>{t('settings')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -103,8 +114,28 @@ export default function HomeScreen({ user, onLogout }) {
           without showing any UI or tab for it. */}
       <AutoTrackScreen user={user} active={isPunchedIn} />
 
+      <View style={styles.languageSection}>
+        <Text style={styles.languageLabel}>{t('changeLanguage')}</Text>
+        <View style={styles.languageButtons}>
+          {LANGUAGE_OPTIONS.map((option) => (
+            <TouchableOpacity
+              key={option.code}
+              style={[
+                styles.languageOption,
+                language === option.code && styles.languageOptionActive,
+              ]}
+              onPress={() => setLanguage(option.code)}
+            >
+              <Text style={language === option.code ? styles.languageOptionTextActive : styles.languageOptionText}>
+                {option.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
       <TouchableOpacity onPress={onLogout} style={styles.logoutButton}>
-        <Text style={styles.logoutText}>Log Out</Text>
+        <Text style={styles.logoutText}>{t('logout')}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -131,4 +162,23 @@ const styles = StyleSheet.create({
   bannerButtonText: { color: "#081c15", fontWeight: "700" },
   bannerLink: { paddingVertical: 10, paddingHorizontal: 18 },
   bannerLinkText: { color: "#60a5fa", fontWeight: "700" },
+  languageSection: { paddingHorizontal: 24, paddingBottom: 16 },
+  languageLabel: { color: "#f1f5f9", marginBottom: 10, fontSize: 14 },
+  languageButtons: { flexDirection: "row", justifyContent: "space-between" },
+  languageOption: {
+    flex: 1,
+    backgroundColor: "#1e293b",
+    borderRadius: 10,
+    paddingVertical: 10,
+    marginRight: 8,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#334155",
+  },
+  languageOptionActive: {
+    backgroundColor: "#22c55e",
+    borderColor: "#22c55e",
+  },
+  languageOptionText: { color: "#f1f5f9", fontSize: 13 },
+  languageOptionTextActive: { color: "#0f172a", fontSize: 13, fontWeight: "700" },
 });

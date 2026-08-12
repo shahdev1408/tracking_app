@@ -2,6 +2,8 @@
 export const API_BASE_URL = "https://tracking-app-ps25.onrender.com";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import NetInfo from "@react-native-community/netinfo";
+import { Platform, PermissionsAndroid } from 'react-native';
 
 let authToken = null;
 
@@ -133,42 +135,156 @@ export async function getMyProfile() {
 
 // ---------- Punch / Tracking (require login) ----------
 
-export async function sendPunch({
-  type, site, location, latitude, longitude,
-  punchCategory, workType, photoBase64, deviceName, deviceId,
-}) {
-  const res = await fetch(`${API_BASE_URL}/api/punch`, {
-    method: "POST",
-    headers: authHeaders(),
-    body: JSON.stringify({
-      type, site, location, latitude, longitude,
-      punchCategory, workType, photoBase64, deviceName, deviceId,
-    }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Punch failed");
-  return data;
+const OFFLINE_PUNCH_QUEUE_KEY = "offlinePunchQueue";
+
+async function loadOfflinePunchQueue() {
+  try {
+    const raw = await AsyncStorage.getItem(OFFLINE_PUNCH_QUEUE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (err) {
+    console.log("Could not read offline punch queue:", err.message);
+    return [];
+  }
 }
 
-import { Platform, PermissionsAndroid } from 'react-native';
+async function persistOfflinePunchQueue(queue) {
+  try {
+    await AsyncStorage.setItem(OFFLINE_PUNCH_QUEUE_KEY, JSON.stringify(queue));
+  } catch (err) {
+    console.log("Could not persist offline punch queue:", err.message);
+  }
+}
 
-export async function sendPing({ latitude, longitude, deviceName, deviceId }) {
+async function queuePunch(payload) {
+  const queue = await loadOfflinePunchQueue();
+  queue.push({ ...payload, createdAt: new Date().toISOString() });
+  await persistOfflinePunchQueue(queue);
+}
+
+async function isConnected() {
+  try {
+    const state = await NetInfo.fetch();
+    return !!state.isConnected;
+  } catch (err) {
+    console.log("Network status check failed:", err.message);
+    return false;
+  }
+}
+
+export async function uploadQueuedPunches() {
+  const online = await isConnected();
+  if (!online) return;
+
+  await ensureAuthToken();
+  const queue = await loadOfflinePunchQueue();
+  if (!queue.length) return;
+
+  const remaining = [];
+  for (const item of queue) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/punch`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify(item),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        console.log("Queued punch upload failed:", data.error || res.statusText);
+        remaining.push(item);
+      }
+    } catch (err) {
+      console.log("Queued punch upload error:", err.message);
+      remaining.push(item);
+    }
+  }
+
+  if (remaining.length !== queue.length) {
+    await persistOfflinePunchQueue(remaining);
+  }
+}
+
+export async function sendPunch({
+  type, site, location, latitude, longitude,
+  punchCategory, workType, photoBase64,
+  transportMode, photoType,
+  deviceName, deviceId,
+}) {
+  const payload = {
+    type, site, location, latitude, longitude,
+    punchCategory, workType, transportMode, photoType,
+    photoBase64, deviceName, deviceId,
+  };
+
+  await ensureAuthToken();
+  const online = await isConnected();
+  if (!online) {
+    await queuePunch(payload);
+    return { queued: true, message: "Saved offline and will upload when connection returns." };
+  }
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/punch`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      if (res.status >= 500) {
+        await queuePunch(payload);
+        return { queued: true, message: "Server unavailable. Saved offline and will retry later." };
+      }
+      throw new Error(data.error || "Punch failed");
+    }
+    return data;
+  } catch (err) {
+    await queuePunch(payload);
+    return { queued: true, message: "Network error. Saved offline and will upload later." };
+  }
+}
+
+export async function sendPing({ latitude, longitude, deviceName, deviceId, timestamp }) {
   let backgroundPermission = null;
+  let batteryOptimizationStatus = "unknown";
+
   try {
     if (Platform.OS === 'android') {
-      // ACCESS_BACKGROUND_LOCATION may not be available on older SDKs — wrap safely
       backgroundPermission = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.ACCESS_BACKGROUND_LOCATION);
     }
   } catch (err) {
     backgroundPermission = null;
   }
 
+  const payload = {
+    latitude,
+    longitude,
+    deviceName,
+    deviceId,
+    backgroundPermission,
+    batteryOptimizationStatus,
+    timestamp: timestamp || new Date().toISOString(),
+  };
+
   const res = await fetch(`${API_BASE_URL}/api/tracking/ping`, {
     method: "POST",
     headers: authHeaders(),
-    body: JSON.stringify({ latitude, longitude, deviceName, deviceId, backgroundPermission }),
+    body: JSON.stringify(payload),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Ping failed");
   return data;
 }
+
+export async function checkAppUpdate() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/appVersion`);
+    if (!res.ok) return null;
+    return await res.json(); // { latestVersion, downloadUrl }
+  } catch (err) {
+    return null;
+  }
+}
+
+
+
+

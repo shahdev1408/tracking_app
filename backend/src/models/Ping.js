@@ -11,6 +11,7 @@ const pingSchema = new mongoose.Schema({
   placeName: { type: String },
   deviceName: { type: String },
   deviceId: { type: String },
+  batteryOptimizationStatus: { type: String, default: null },
 }, { timestamps: true });
 
 module.exports = mongoose.model("Ping", pingSchema);

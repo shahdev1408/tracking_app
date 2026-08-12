@@ -1,11 +1,21 @@
-import React, { useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { Platform, PermissionsAndroid } from "react-native";
 import Geolocation from "react-native-geolocation-service";
 import { sendPing } from "../services/api";
 import { getDeviceInfo } from "../utils/deviceInfo";
 
-const DISTANCE_TRIGGER_METERS = 300; // fires every 300m moved for a smoother, more accurate route
-const TIME_TRIGGER_MS = 10 * 60 * 1000; // 10 minutes passed while app is open (foreground safety net)
+// Foreground (app open) tracking cadence. These are kept aggressive so the
+// admin dashboard's "live" view feels near-real-time (like WhatsApp live
+// location) while the employee's app is open:
+//   - ping after every 50m moved (smooth route, catches most movement)
+//   - always ping at least once every 60s as a safety net, so even a
+//     stationary employee still sends a fresh "I'm here" signal.
+// NOTE: this only applies while the app is foregrounded. When the app is
+// closed/background, Android OS caps background wake-ups at ~15 min (see
+// backgroundTracker.js), so real-time freshness is only achievable while
+// the app is open.
+const DISTANCE_TRIGGER_METERS = 50;
+const TIME_TRIGGER_MS = 60 * 1000;
 
 // This screen no longer renders any UI - the employee should not see or
 // know that automatic tracking exists as a separate feature. It still runs
@@ -22,8 +32,8 @@ export default function AutoTrackScreen({ user, active }) {
       const granted = await PermissionsAndroid.request(
         PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
         {
-          title: "Location Permission",
-          message: "This app needs your location to work correctly. Please allow location access.",
+          title: "Allow Location",
+          message: "Allow Location",
           buttonPositive: "Allow",
         }
       );

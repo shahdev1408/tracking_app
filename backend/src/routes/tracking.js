@@ -9,7 +9,7 @@ const { reverseGeocode } = require("../utils/geocode");
 router.post("/ping", requireAuth, async (req, res) => {
   try {
     const employeeId = req.user.employeeId;
-    const { latitude, longitude, timestamp, deviceName, deviceId, backgroundPermission } = req.body;
+    const { latitude, longitude, timestamp, deviceName, deviceId, backgroundPermission, batteryOptimizationStatus } = req.body;
 
     if (latitude == null || longitude == null) {
       return res.status(400).json({ error: "latitude, longitude are required" });
@@ -21,12 +21,26 @@ router.post("/ping", requireAuth, async (req, res) => {
     }
 
     const ts = timestamp ? new Date(timestamp) : new Date();
+
+    // Deduplication window: If a ping for this employee exists within 30 seconds
+    // or at identical coordinates, return existing ping instead of inserting a duplicate.
+    const thirtySecsAgo = new Date(ts.getTime() - 30 * 1000);
+    const existingPing = await Ping.findOne({
+      employeeId,
+      timestamp: { $gte: thirtySecsAgo, $lte: new Date(ts.getTime() + 30 * 1000) }
+    }).sort({ timestamp: -1 });
+
+    if (existingPing) {
+      return res.status(200).json({ message: "Duplicate ping ignored within 30s window", ping: existingPing, duplicate: true });
+    }
+
     const { isSunday, isOfficeHours, billable } = evaluatePoint(ts, emp?.officeStartTime, emp?.officeEndTime);
     const placeName = await reverseGeocode(latitude, longitude);
 
     const ping = await Ping.create({
       employeeId, latitude, longitude, timestamp: ts,
       isSunday, isOfficeHours, billable, placeName, deviceName, deviceId,
+      batteryOptimizationStatus: batteryOptimizationStatus || null,
     });
 
     const updateObj = {
@@ -34,6 +48,7 @@ router.post("/ping", requireAuth, async (req, res) => {
       lastDevice: { deviceName, deviceId, timestamp: ts },
     };
     if (typeof backgroundPermission === 'boolean') updateObj.backgroundPermission = backgroundPermission;
+    if (typeof batteryOptimizationStatus === 'string') updateObj.batteryOptimizationStatus = batteryOptimizationStatus;
 
     await User.updateOne({ employeeId }, { $set: updateObj });
 
@@ -46,7 +61,7 @@ router.post("/ping", requireAuth, async (req, res) => {
 router.get("/latest/:employeeId", requireAuth, requireManager, async (req, res) => {
   try {
     const { employeeId } = req.params;
-    const user = await User.findOne({ employeeId }).select("employeeId lastLocation lastDevice backgroundPermission");
+    const user = await User.findOne({ employeeId }).select("employeeId lastLocation lastDevice backgroundPermission batteryOptimizationStatus");
     if (!user) return res.status(404).json({ error: "Employee not found" });
 
     res.json({
@@ -54,6 +69,7 @@ router.get("/latest/:employeeId", requireAuth, requireManager, async (req, res) 
       lastLocation: user.lastLocation || null,
       lastDevice: user.lastDevice || null,
       backgroundPermission: user.backgroundPermission,
+      batteryOptimizationStatus: user.batteryOptimizationStatus || null,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -63,7 +79,7 @@ router.get("/latest/:employeeId", requireAuth, requireManager, async (req, res) 
 router.get("/status/:employeeId", requireAuth, requireManager, async (req, res) => {
   try {
     const { employeeId } = req.params;
-    const user = await User.findOne({ employeeId }).select("employeeId lastLocation lastDevice backgroundPermission");
+    const user = await User.findOne({ employeeId }).select("employeeId lastLocation lastDevice backgroundPermission batteryOptimizationStatus");
     if (!user) return res.status(404).json({ error: "Employee not found" });
 
     const lastLocation = user.lastLocation || null;
@@ -77,6 +93,7 @@ router.get("/status/:employeeId", requireAuth, requireManager, async (req, res) 
       lastLocation,
       lastDevice: user.lastDevice,
       backgroundPermission: user.backgroundPermission,
+      batteryOptimizationStatus: user.batteryOptimizationStatus || null,
       lastPingAgeMinutes,
       stale,
     });

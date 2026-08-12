@@ -42,6 +42,7 @@ const userSchema = new mongoose.Schema({
     processedAt: { type: Date, default: null },
   },
   backgroundPermission: { type: Boolean, default: null },
+  batteryOptimizationStatus: { type: String, default: null }, // "unrestricted" | "restricted"
   lastPermissionReminderAt: { type: Date, default: null },
 
   // Auto-tracking schedule (set by manager) - lets background tracking run

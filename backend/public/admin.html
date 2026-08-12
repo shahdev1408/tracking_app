@@ -825,12 +825,19 @@
         ? `${u.lastDevice.deviceName || "unknown"}${u.lastDevice.deviceId ? " · " + u.lastDevice.deviceId : ""}`
         : "No login recorded";
 
-      // Background permission status (boolean expected as u.backgroundPermission)
+      // Background permission status
       const bgStatus = (u.backgroundPermission === true)
         ? `<span style="color:var(--live); font-weight:700;">Background: Allowed</span>`
         : (u.backgroundPermission === false)
           ? `<span style="color:var(--danger); font-weight:700;">Background: Needs permission</span>`
           : `<span class="dim">Background: Unknown</span>`;
+
+      // Battery optimization status
+      const battStatus = (u.batteryOptimizationStatus === "unrestricted")
+        ? `<span style="color:var(--live); font-weight:700;">🔋 Battery: Unrestricted</span>`
+        : (u.batteryOptimizationStatus === "restricted")
+          ? `<span style="color:var(--danger); font-weight:700;">🔋 Battery: Restricted (May delay tracking)</span>`
+          : `<span class="dim">🔋 Battery: Unknown</span>`;
 
       const ocrStatus = u.lastOcr?.text
         ? `<span style="color:var(--live); font-weight:700;">✅ OCR</span>`
@@ -862,6 +869,7 @@
           <span>Last seen <span class="dim">${lastSeen}</span></span>
           <span>Device <span class="dim">${loginDevice}</span></span>
           <span>${bgStatus}</span>
+          <span>${battStatus}</span>
           <span>${ocrStatus}</span>
         </div>
         ${actionsHtml}
@@ -959,6 +967,9 @@
       const lastPingAge = emp.lastLocation?.timestamp ? `${Math.floor((Date.now() - new Date(emp.lastLocation.timestamp).getTime()) / 60000)}m ago` : '—';
       const pingStatus = emp.lastLocation?.timestamp ? (Math.floor((Date.now() - new Date(emp.lastLocation.timestamp).getTime()) / 60000) > 15 ? 'Stale' : 'Fresh') : 'None';
       const pingColor = pingStatus === 'Fresh' ? 'var(--live)' : pingStatus === 'Stale' ? 'var(--danger)' : 'var(--text-faint)';
+      const battText = emp.batteryOptimizationStatus === 'unrestricted' ? 'Unrestricted (Good)' : (emp.batteryOptimizationStatus === 'restricted' ? 'Restricted (Warning)' : 'Unknown');
+      const battColor = emp.batteryOptimizationStatus === 'unrestricted' ? 'var(--live)' : (emp.batteryOptimizationStatus === 'restricted' ? 'var(--danger)' : '');
+
       document.getElementById("detailStats").innerHTML = `
         <div class="stat-card"><div class="label">Rate</div><div class="value">₹${dailyData.ratePerKm}/km</div></div>
         <div class="stat-card accent"><div class="label">Pay due</div><div class="value">₹${dailyData.totals.pay}</div></div>
@@ -968,8 +979,8 @@
         <div class="stat-card"><div class="label">Ping age</div><div class="value" id="detailPingAge">${lastPingAge}</div></div>
         <div class="stat-card"><div class="label">Ping status</div><div class="value" id="detailPingStatus" style="color:${pingColor};">${pingStatus}</div></div>
         <div class="stat-card"><div class="label">Last OCR</div><div class="value">${emp.lastOcr?.text ? escapeHtml(emp.lastOcr.text) : 'No OCR yet'}</div></div>
-        <div class="stat-card"><div class="label">OCR confidence</div><div class="value">${emp.lastOcr?.confidence != null ? `${emp.lastOcr.confidence}%` : '—'}</div></div>
-        <div class="stat-card wide"><div class="label">Background</div><div class="value" style="color:${permColor};">${permText}</div></div>
+        <div class="stat-card"><div class="label">Background</div><div class="value" style="color:${permColor};">${permText}</div></div>
+        <div class="stat-card"><div class="label">Battery Opt.</div><div class="value" style="color:${battColor};">${battText}</div></div>
       `;
 
       renderDailySummary(dailyData.days);
@@ -1021,6 +1032,13 @@
       const row = document.createElement("div");
       row.className = "day-block";
 
+      const odoHtml = (d.odometerKm != null)
+        ? `<div class="day-line" style="margin-top:6px; padding:6px 8px; background:var(--panel-3); border-radius:6px;">
+            <b>📸 Odometer:</b> ${d.startOdometer || '—'} → ${d.endOdometer || '—'} (<b>${d.odometerKm} km</b>) | <b>📍 Filtered GPS:</b> ${d.totalKm} km
+            ${d.odometerDiscrepancyPercent != null ? (d.odometerDiscrepancyPercent > 15 ? `<div style="color:var(--danger); font-weight:700; margin-top:3px;">⚠️ Audit Alert: ${d.odometerDiscrepancyPercent}% discrepancy between Odometer and GPS!</div>` : `<div style="color:var(--live); font-weight:600; margin-top:3px;">✅ Odometer vs GPS Verified (${d.odometerDiscrepancyPercent}% diff)</div>`) : ''}
+           </div>`
+        : `<div class="day-line" style="margin-top:6px; font-size:11.5px; color:var(--text-faint);">📸 Odometer photos not uploaded / readings pending verification</div>`;
+
       const manualHtml = d.manualPunches.map((p) => {
         punchOcrData[p._id] = p.ocrResult || null;
         return `
@@ -1063,6 +1081,7 @@
         </div>
         <div class="day-line">${inTime} → ${outTime} · ${d.totalKm} km total</div>
         <div class="day-line">Manual ${d.punchCount} · Auto ${d.pingCount} · Billable ${d.billableKm} km</div>
+        ${odoHtml}
 
         ${d.route.length > 0 ? `<button class="btn-route" onclick="showRouteOnMap(${realIdx})">View route on map</button>` : ""}
 

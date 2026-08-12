@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { SafeAreaView, StatusBar, View, ActivityIndicator } from 'react-native';
+import { SafeAreaView, StatusBar, View, ActivityIndicator, Alert, Linking } from 'react-native';
 import LoginScreen from './src/screens/LoginScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import {
-  setAuthToken, getStoredUser, persistUser, clearSession, ensureAuthToken, getMyProfile,
+  setAuthToken, getStoredUser, persistUser, clearSession, ensureAuthToken, getMyProfile, checkAppUpdate,
 } from './src/services/api';
+import { LanguageProvider } from './src/utils/language';
 
 // NOTE: session storage now goes through the helpers in services/api.js
 // (setAuthToken/getStoredUser/persistUser/clearSession) instead of calling
@@ -13,6 +14,9 @@ import {
 // when it wakes up in a fresh JS context - if App.js and the background
 // task used different storage keys, the background schedule ping would
 // never find a valid session.
+
+const CURRENT_APP_VERSION = "1.0.0";
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [checkingSession, setCheckingSession] = useState(true);
@@ -21,7 +25,33 @@ export default function App() {
   // straight to the Home screen instead of asking to log in again.
   useEffect(() => {
     restoreSession();
+    verifyAppVersion();
   }, []);
+
+  async function verifyAppVersion() {
+    try {
+      const updateData = await checkAppUpdate();
+      if (updateData && updateData.latestVersion && updateData.latestVersion !== CURRENT_APP_VERSION) {
+        Alert.alert(
+          "Update Available",
+          `A new version (${updateData.latestVersion}) of the Tracking App is available with improvements and fixes. Please update to continue.`,
+          [
+            { text: "Later", style: "cancel" },
+            {
+              text: "Update Now",
+              onPress: () => {
+                if (updateData.downloadUrl) {
+                  Linking.openURL(updateData.downloadUrl).catch(() => {});
+                }
+              },
+            },
+          ]
+        );
+      }
+    } catch (err) {
+      console.log("App version check failed:", err.message);
+    }
+  }
 
   async function restoreSession() {
     try {
@@ -75,13 +105,15 @@ export default function App() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#0f172a' }}>
-      <StatusBar barStyle="light-content" />
-      {user ? (
-        <HomeScreen user={user} onLogout={handleLogout} />
-      ) : (
-        <LoginScreen onLoginSuccess={handleLoginSuccess} />
-      )}
-    </SafeAreaView>
+    <LanguageProvider>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#0f172a' }}>
+        <StatusBar barStyle="light-content" />
+        {user ? (
+          <HomeScreen user={user} onLogout={handleLogout} />
+        ) : (
+          <LoginScreen onLoginSuccess={handleLoginSuccess} />
+        )}
+      </SafeAreaView>
+    </LanguageProvider>
   );
 }

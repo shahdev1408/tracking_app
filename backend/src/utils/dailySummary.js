@@ -69,6 +69,14 @@ function buildDailySummary(pings, punches, ratePerKm = 0, startPoint = null, end
         routeForDistance.push({ latitude: endPoint.latitude, longitude: endPoint.longitude, billable: true, kind: "end_point" });
       }
 
+      const startOdometer = punchIn ? (typeof punchIn.odometerReading === 'number' ? punchIn.odometerReading : (punchIn.ocrResult?.text ? parseFloat(punchIn.ocrResult.text.replace(/[^0-9.]/g, '')) || null : null)) : null;
+      const endOdometer = punchOut ? (typeof punchOut.odometerReading === 'number' ? punchOut.odometerReading : (punchOut.ocrResult?.text ? parseFloat(punchOut.ocrResult.text.replace(/[^0-9.]/g, '')) || null : null)) : null;
+      
+      let odometerKm = null;
+      if (startOdometer != null && endOdometer != null && !isNaN(startOdometer) && !isNaN(endOdometer) && endOdometer >= startOdometer) {
+        odometerKm = Number((endOdometer - startOdometer).toFixed(2));
+      }
+
       const billablePoints = routeForDistance.filter((p) => p.billable);
       const personalPoints = routeForDistance.filter((p) => !p.billable);
 
@@ -76,6 +84,12 @@ function buildDailySummary(pings, punches, ratePerKm = 0, startPoint = null, end
       const personalKm = totalDistanceKm(personalPoints);
       const totalKm = totalDistanceKm(routeForDistance);
       const pay = Number((billableKm * ratePerKm).toFixed(2));
+
+      let odometerDiscrepancyPercent = null;
+      if (odometerKm != null && odometerKm > 0) {
+        const diff = Math.abs(totalKm - odometerKm);
+        odometerDiscrepancyPercent = Number(((diff / odometerKm) * 100).toFixed(1));
+      }
 
       let cumulativeKm = 0;
       const routeWithDistance = routeForDistance.map((p, i) => {
@@ -124,6 +138,10 @@ function buildDailySummary(pings, punches, ratePerKm = 0, startPoint = null, end
         lastActivity,
         punchInTime: punchIn ? punchIn.timestamp : null,
         punchOutTime: punchOut ? punchOut.timestamp : null,
+        startOdometer,
+        endOdometer,
+        odometerKm,
+        odometerDiscrepancyPercent,
         totalKm: Number(totalKm.toFixed(2)),
         billableKm: Number(billableKm.toFixed(2)),
         personalKm: Number(personalKm.toFixed(2)),

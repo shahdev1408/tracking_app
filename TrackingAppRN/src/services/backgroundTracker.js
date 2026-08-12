@@ -31,7 +31,7 @@
 import BackgroundFetch from "react-native-background-fetch";
 import Geolocation from "react-native-geolocation-service";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { sendPing, getMyProfile, ensureAuthToken, getStoredPunchStatus } from "./api";
+import { sendPing, uploadQueuedPunches, getMyProfile, ensureAuthToken, getStoredPunchStatus } from "./api";
 import { getDeviceInfo } from "../utils/deviceInfo";
 
 const DAY_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
@@ -91,6 +91,7 @@ async function getLocationAndPing() {
 
 async function runBackgroundCheck(punchActive) {
   await ensureAuthToken();
+  await uploadQueuedPunches();
 
   if (!punchActive) {
     punchActive = await getStoredPunchStatus();
