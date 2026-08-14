@@ -243,6 +243,8 @@ export async function sendPunch({
   }
 }
 
+import DeviceInfo from 'react-native-device-info';
+
 export async function sendPing({ latitude, longitude, deviceName, deviceId, timestamp }) {
   let backgroundPermission = null;
   let batteryOptimizationStatus = "unknown";
@@ -250,9 +252,13 @@ export async function sendPing({ latitude, longitude, deviceName, deviceId, time
   try {
     if (Platform.OS === 'android') {
       backgroundPermission = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.ACCESS_BACKGROUND_LOCATION);
+      if (DeviceInfo && typeof DeviceInfo.isBatteryOptimizationEnabled === 'function') {
+        const isOpt = await DeviceInfo.isBatteryOptimizationEnabled();
+        batteryOptimizationStatus = isOpt ? "restricted" : "unrestricted";
+      }
     }
   } catch (err) {
-    backgroundPermission = null;
+    batteryOptimizationStatus = "unknown";
   }
 
   const payload = {
