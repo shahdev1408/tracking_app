@@ -1,4 +1,4 @@
-package com.trackingapprn
+package com.mmipl.track
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate

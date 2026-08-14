@@ -1,4 +1,4 @@
-package com.trackingapprn
+package com.mmipl.track
 
 import android.app.Application
 import com.facebook.react.PackageList
