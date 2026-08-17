@@ -89,22 +89,13 @@ async function getLocationAndPing() {
   }
 }
 
-async function runBackgroundCheck(punchActive) {
+async function runBackgroundCheck() {
   await ensureAuthToken();
   await uploadQueuedPunches();
 
-  if (!punchActive) {
-    punchActive = await getStoredPunchStatus();
-  }
-
-  if (punchActive) {
-    await getLocationAndPing();
-    return;
-  }
-
   try {
     const profile = await getMyProfile();
-    if (!profile.active) return;
+    if (!profile || !profile.active) return;
     const schedule = profile.autoSchedule;
     if (!isWithinScheduledWindow(schedule)) return;
 

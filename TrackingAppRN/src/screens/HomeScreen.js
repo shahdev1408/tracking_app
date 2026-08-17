@@ -110,9 +110,8 @@ export default function HomeScreen({ user, onLogout }) {
         <ManualPunchScreen user={user} onPunchStatusChange={handlePunchStatusChange} />
       </View>
 
-      {/* Invisible - keeps auto-tracking running between Punch In/Out
-          without showing any UI or tab for it. */}
-      <AutoTrackScreen user={user} active={isPunchedIn} />
+      {/* Invisible - runs schedule-based auto-tracking independently of Punch In/Out */}
+      <AutoTrackScreen user={user} />
 
       <View style={styles.languageSection}>
         <Text style={styles.languageLabel}>{t('changeLanguage')}</Text>
