@@ -1,41 +1,37 @@
 /**
  * Real background location tracking - fires even when the app is minimized.
  *
- * Uses `react-native-background-fetch` (free, MIT licensed) instead of the
- * paid react-native-background-geolocation library. Trade-off: Android only
- * allows background tasks to run a MINIMUM of every 15 minutes (this is an
- * OS-level restriction, not something any library can bypass) - so the
- * background WAKE-UP itself is every ~15 min no matter what. The schedule's
- * "Ping every X minutes" setting works on top of that: every time we wake
- * up, we check how long it's been since the last successful ping and skip
- * unless at least X minutes have passed. That means:
- *   - X = 15 (or less): pings every wake-up, i.e. every ~15 min - the
- *     practical minimum on Android; X < 15 can't be honored exactly.
- *   - X = 30/60/120/180: skips wake-ups until that much time has passed,
- *     so it works exactly as set.
+ * Uses `react-native-background-fetch` (free, MIT licensed).
  *
- * NEW: schedule-based tracking. Every time this task runs, it first checks
- * the employee's `autoSchedule` (set by the manager on the dashboard - days
- * + start time + end time + interval). If the current day/time falls
- * inside that window, it pings (subject to the interval above) -
- * completely independent of whether the employee has manually punched in.
+ * STRATEGY:
+ * 1. BackgroundFetch.configure() gives us a periodic wake-up every ~15 min.
+ *    This is the MINIMUM Android OS allows — it is NOT a precise timer;
+ *    Android batches and delays these for battery savings.
+ *
+ * 2. To get MORE PRECISE pings, we ALSO schedule one-shot tasks using
+ *    BackgroundFetch.scheduleTask() with a `delay` set to the exact number
+ *    of milliseconds until the next ping is due. Android honours one-shot
+ *    tasks more precisely than periodic ones. We chain them: after each
+ *    ping fires, we schedule the next one-shot.
+ *
+ * 3. Schedule (days, startTime, endTime, intervalMinutes) is set by the
+ *    manager on the dashboard. Tracking is 100% independent of Punch
+ *    In / Punch Out.
  *
  * IMPORTANT REAL-WORLD NOTE: Some phone brands (Xiaomi, Oppo, Vivo, OnePlus)
- * aggressively kill background apps to save battery. If tracking stops working
- * after a while on those phones, the employee needs to manually disable
- * "battery optimization" for this app:
- *   Settings -> Apps -> [This App] -> Battery -> Unrestricted / No restrictions
- * This is a known Android manufacturer quirk affecting all tracking/delivery
- * apps, not something we can fix from code alone.
+ * aggressively kill background apps to save battery. If tracking stops on
+ * those phones, the employee needs to disable "battery optimization":
+ *   Settings -> Apps -> [This App] -> Battery -> Unrestricted
  */
 import BackgroundFetch from "react-native-background-fetch";
 import Geolocation from "react-native-geolocation-service";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { sendPing, uploadQueuedPunches, getMyProfile, ensureAuthToken, getStoredPunchStatus } from "./api";
+import { sendPing, uploadQueuedPunches, getMyProfile, ensureAuthToken } from "./api";
 import { getDeviceInfo } from "../utils/deviceInfo";
 
 const DAY_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 const LAST_SCHEDULED_PING_KEY = "lastScheduledPingAt";
+const CACHED_SCHEDULE_KEY = "cachedAutoSchedule";
 
 function isWithinScheduledWindow(schedule) {
   if (!schedule || !schedule.enabled) return false;
@@ -52,15 +48,13 @@ function isWithinScheduledWindow(schedule) {
   return now >= start && now <= end;
 }
 
-async function enoughTimeHasPassed(intervalMinutes) {
+async function getLastPingTime() {
   try {
     const lastStr = await AsyncStorage.getItem(LAST_SCHEDULED_PING_KEY);
-    if (!lastStr) return true;
-    const last = new Date(lastStr).getTime();
-    const minutesSince = (Date.now() - last) / 60000;
-    return minutesSince >= (intervalMinutes || 30);
+    if (!lastStr) return 0;
+    return new Date(lastStr).getTime();
   } catch (err) {
-    return true; // if we can't tell, err on the side of pinging
+    return 0;
   }
 }
 
@@ -69,6 +63,21 @@ async function markScheduledPingSent() {
     await AsyncStorage.setItem(LAST_SCHEDULED_PING_KEY, new Date().toISOString());
   } catch (err) {
     console.log("Could not record last scheduled ping time:", err.message);
+  }
+}
+
+async function cacheSchedule(schedule) {
+  try {
+    await AsyncStorage.setItem(CACHED_SCHEDULE_KEY, JSON.stringify(schedule));
+  } catch (err) { /* ignore */ }
+}
+
+async function getCachedSchedule() {
+  try {
+    const raw = await AsyncStorage.getItem(CACHED_SCHEDULE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (err) {
+    return null;
   }
 }
 
@@ -83,37 +92,68 @@ async function getLocationAndPing() {
     });
     const { deviceName, deviceId } = await getDeviceInfo();
     await sendPing({ latitude: coords.latitude, longitude: coords.longitude, deviceName, deviceId });
-    console.log("Background fetch: ping sent successfully");
+    console.log("Background ping sent at", new Date().toLocaleTimeString());
   } catch (err) {
     console.log("Background fetch: failed to get location/send ping:", err.message);
   }
+}
+
+// Schedule a one-shot background task that will fire after `delayMs`
+// milliseconds. Android honours one-shot tasks more precisely than
+// periodic ones.
+function scheduleOneShotTask(delayMs) {
+  const delaySec = Math.max(Math.round(delayMs / 1000), 60); // min 60s
+  console.log(`Scheduling one-shot background task in ${delaySec}s`);
+  BackgroundFetch.scheduleTask({
+    taskId: "com.mmipl.track.scheduled-ping",
+    delay: delaySec * 1000, // ms
+    periodic: false,
+    stopOnTerminate: false,
+    startOnBoot: true,
+    enableHeadless: true,
+    requiredNetworkType: BackgroundFetch.NETWORK_TYPE_ANY,
+  }).catch(err => console.log("Failed to schedule one-shot task:", err));
 }
 
 async function runBackgroundCheck() {
   await ensureAuthToken();
   await uploadQueuedPunches();
 
+  let schedule = null;
   try {
     const profile = await getMyProfile();
     if (!profile || !profile.active) return;
-    const schedule = profile.autoSchedule;
-    if (!isWithinScheduledWindow(schedule)) return;
-
-    const canPingNow = await enoughTimeHasPassed(schedule.intervalMinutes);
-    if (!canPingNow) return;
-
-    await getLocationAndPing();
-    await markScheduledPingSent();
+    schedule = profile.autoSchedule;
+    if (schedule) await cacheSchedule(schedule);
   } catch (err) {
-    console.log("Background fetch: could not check schedule:", err.message);
+    console.log("Background: could not fetch profile, using cache:", err.message);
+    schedule = await getCachedSchedule();
   }
+
+  if (!schedule || !isWithinScheduledWindow(schedule)) return;
+
+  const intervalMs = (schedule.intervalMinutes || 30) * 60 * 1000;
+  const lastPingMs = await getLastPingTime();
+  const elapsed = Date.now() - lastPingMs;
+
+  if (elapsed < intervalMs - 5000) {
+    // Not time yet — schedule a precise one-shot for the remaining time
+    const remaining = intervalMs - elapsed;
+    scheduleOneShotTask(remaining);
+    return;
+  }
+
+  // Time to ping!
+  await getLocationAndPing();
+  await markScheduledPingSent();
+
+  // Chain: schedule the NEXT one-shot for exactly intervalMs from now
+  scheduleOneShotTask(intervalMs);
 }
 
 let alreadyConfigured = false;
 
 export function initBackgroundFetch(user) {
-  // Guard against configure() running more than once if HomeScreen ever
-  // remounts (e.g. logout -> login again in the same app session).
   if (alreadyConfigured) return;
   alreadyConfigured = true;
 
@@ -126,23 +166,39 @@ export function initBackgroundFetch(user) {
       requiredNetworkType: BackgroundFetch.NETWORK_TYPE_ANY,
     },
     async (taskId) => {
-      await runBackgroundCheck(false);
+      console.log("BackgroundFetch event:", taskId, "at", new Date().toLocaleTimeString());
+      await runBackgroundCheck();
       BackgroundFetch.finish(taskId);
     },
     (error) => {
       console.log("Background fetch failed to configure:", error);
     }
   );
+
+  // Also schedule an initial one-shot to start the precise chain
+  (async () => {
+    let schedule = null;
+    try {
+      const profile = await getMyProfile();
+      schedule = profile?.autoSchedule;
+      if (schedule) await cacheSchedule(schedule);
+    } catch (e) {
+      schedule = await getCachedSchedule();
+    }
+    if (schedule && schedule.enabled) {
+      const intervalMs = (schedule.intervalMinutes || 30) * 60 * 1000;
+      const lastPingMs = await getLastPingTime();
+      const elapsed = Date.now() - lastPingMs;
+      const remaining = Math.max(intervalMs - elapsed, 60000);
+      scheduleOneShotTask(remaining);
+    }
+  })();
 }
 
-// Registers the headless task - must be called exactly ONCE, at app
-// startup, from index.js (NOT from inside a component/useEffect). Calling
-// it from a component causes the "registerHeadlessTask called multiple
-// times for same key 'BackgroundFetch'" warning, since the component can
-// mount more than once during the app's lifetime (e.g. logout -> login).
 export function registerBackgroundHeadlessTask() {
   BackgroundFetch.registerHeadlessTask(async (event) => {
-    await runBackgroundCheck(false);
+    console.log("Headless event:", event.taskId, "at", new Date().toLocaleTimeString());
+    await runBackgroundCheck();
     BackgroundFetch.finish(event.taskId);
   });
 }
