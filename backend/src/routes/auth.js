@@ -4,7 +4,7 @@ const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const { signToken, requireAuth, requireManager } = require("../middleware/auth");
 
-router.post("/register", async (req, res) => {
+router.post("/register", requireAuth, requireManager, async (req, res) => {
   try {
     const { employeeId, name, phone, password } = req.body;
     if (!employeeId || !name || !password) {

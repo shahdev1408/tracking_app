@@ -175,6 +175,8 @@ export async function uploadQueuedPunches() {
   const online = await isConnected();
   if (!online) return;
 
+  await uploadQueuedPings().catch(console.log);
+
   await ensureAuthToken();
   const queue = await loadOfflinePunchQueue();
   if (!queue.length) return;
@@ -243,7 +245,63 @@ export async function sendPunch({
   }
 }
 
-import DeviceInfo from 'react-native-device-info';
+const OFFLINE_PING_QUEUE_KEY = "offlinePingQueue";
+
+async function loadOfflinePingQueue() {
+  try {
+    const raw = await AsyncStorage.getItem(OFFLINE_PING_QUEUE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (err) {
+    console.log("Could not read offline ping queue:", err.message);
+    return [];
+  }
+}
+
+async function persistOfflinePingQueue(queue) {
+  try {
+    await AsyncStorage.setItem(OFFLINE_PING_QUEUE_KEY, JSON.stringify(queue));
+  } catch (err) {
+    console.log("Could not persist offline ping queue:", err.message);
+  }
+}
+
+async function queuePing(payload) {
+  const queue = await loadOfflinePingQueue();
+  // Keep queue size manageable (max 200 pings)
+  if (queue.length >= 200) queue.shift();
+  queue.push({ ...payload, createdAt: new Date().toISOString() });
+  await persistOfflinePingQueue(queue);
+}
+
+export async function uploadQueuedPings() {
+  const online = await isConnected();
+  if (!online) return;
+
+  await ensureAuthToken();
+  const queue = await loadOfflinePingQueue();
+  if (!queue.length) return;
+
+  const remaining = [];
+  for (const item of queue) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/tracking/ping`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify(item),
+      });
+      const data = await res.json();
+      if (!res.ok && res.status >= 500) {
+        remaining.push(item);
+      }
+    } catch (err) {
+      remaining.push(item);
+    }
+  }
+
+  if (remaining.length !== queue.length) {
+    await persistOfflinePingQueue(remaining);
+  }
+}
 
 export async function sendPing({ latitude, longitude, deviceName, deviceId, timestamp }) {
   let backgroundPermission = null;
@@ -271,14 +329,31 @@ export async function sendPing({ latitude, longitude, deviceName, deviceId, time
     timestamp: timestamp || new Date().toISOString(),
   };
 
-  const res = await fetch(`${API_BASE_URL}/api/tracking/ping`, {
-    method: "POST",
-    headers: authHeaders(),
-    body: JSON.stringify(payload),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Ping failed");
-  return data;
+  const online = await isConnected();
+  if (!online) {
+    await queuePing(payload);
+    return { queued: true, message: "Ping saved offline." };
+  }
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/tracking/ping`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      if (res.status >= 500) {
+        await queuePing(payload);
+        return { queued: true, message: "Ping saved offline due to server status." };
+      }
+      throw new Error(data.error || "Ping failed");
+    }
+    return data;
+  } catch (err) {
+    await queuePing(payload);
+    return { queued: true, message: "Network error. Ping saved offline." };
+  }
 }
 
 export async function checkAppUpdate() {

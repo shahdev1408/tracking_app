@@ -96,7 +96,7 @@ export default function ManualPunchScreen({ user, onPunchStatusChange }) {
 
   async function capturePhoto(slot) {
     launchCamera(
-      { mediaType: "photo", saveToPhotos: false, cameraType: "back", quality: 0.7, includeBase64: true },
+      { mediaType: "photo", saveToPhotos: false, cameraType: "back", quality: 0.6, maxWidth: 1024, maxHeight: 1024, includeBase64: true },
       (response) => {
         if (response.didCancel) return;
         if (response.errorCode) {

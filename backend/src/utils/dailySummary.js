@@ -1,8 +1,10 @@
 const { totalDistanceKm, haversineKm } = require("./distance");
 
 function toDateKey(date) {
+  if (!date) return "";
   const d = new Date(date);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  // Ensure dates are grouped by Indian Standard Time (IST) date YYYY-MM-DD
+  return d.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
 }
 
 function buildDailySummary(pings, punches, ratePerKm = 0, startPoint = null, endPoint = null) {

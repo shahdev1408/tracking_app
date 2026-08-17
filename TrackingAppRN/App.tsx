@@ -15,10 +15,10 @@ import { LanguageProvider } from './src/utils/language';
 // task used different storage keys, the background schedule ping would
 // never find a valid session.
 
-const CURRENT_APP_VERSION = "1.0.0";
+import { CURRENT_APP_VERSION } from './src/utils/appVersion';
 
 export default function App() {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<any>(null);
   const [checkingSession, setCheckingSession] = useState(true);
 
   // On app start, check if we already have a saved login - if so, skip
@@ -48,7 +48,7 @@ export default function App() {
           ]
         );
       }
-    } catch (err) {
+    } catch (err: any) {
       console.log("App version check failed:", err.message);
     }
   }
@@ -62,21 +62,23 @@ export default function App() {
         return;
       }
 
-      // Confirm with the backend that the account still exists and hasn't
-      // been disabled by the manager since the app was last open, rather
-      // than blindly trusting what's saved on disk.
-      const freshProfile = await getMyProfile();
-      if (!freshProfile.active) {
-        await clearSession();
-        setCheckingSession(false);
-        return;
+      try {
+        // Try fetching fresh profile from backend
+        const freshProfile = await getMyProfile();
+        if (!freshProfile.active) {
+          await clearSession();
+          setCheckingSession(false);
+          return;
+        }
+        await persistUser(freshProfile);
+        setUser(freshProfile);
+      } catch (netErr: any) {
+        // Offline / network failure: do NOT clear session! Load cached user
+        console.log("Offline mode — loaded saved user session:", netErr.message);
+        setUser(savedUser);
       }
-
-      await persistUser(freshProfile); // keep the stored copy up to date
-      setUser(freshProfile);
-    } catch (err) {
+    } catch (err: any) {
       console.log('Failed to restore session:', err.message);
-      await clearSession();
     } finally {
       setCheckingSession(false);
     }
