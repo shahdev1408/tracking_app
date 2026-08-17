@@ -7,6 +7,7 @@ import { getStoredPunchStatus } from "../services/api";
 import NetInfo from "@react-native-community/netinfo";
 import { useLanguage, LANGUAGE_OPTIONS } from "../utils/language";
 import { uploadQueuedPunches } from "../services/api";
+import { checkForAppUpdate } from "../utils/appVersion";
 
 // Auto Track is no longer a visible tab - employees should not see or know
 // it exists as a separate feature. It still runs exactly the same way:
@@ -21,6 +22,7 @@ export default function HomeScreen({ user, onLogout }) {
     restorePunchStatus();
     uploadQueuedPunches().catch(console.log);
     checkLocationPermission();
+    checkForAppUpdate();
     if (user) initBackgroundFetch(user);
  
     const unsubscribe = NetInfo.addEventListener((state) => {
