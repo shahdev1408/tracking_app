@@ -14,7 +14,7 @@ import { Alert, Linking } from "react-native";
 import { API_BASE_URL } from "../services/api";
 
 // Bump this string every time you release a new build.
-export const CURRENT_APP_VERSION = "1.0.0";
+export const CURRENT_APP_VERSION = "1.1.0";
 
 function isNewer(latest, current) {
   const l = latest.split(".").map(Number);
